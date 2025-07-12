@@ -33,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (authProvider.isAuthenticated) {
       // Nếu đã xác thực, chuyển đến màn hình chính
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => const BottomNavScreen()),
       );
     } else {
       // Nếu chưa xác thực, chuyển đến màn hình đăng nhập

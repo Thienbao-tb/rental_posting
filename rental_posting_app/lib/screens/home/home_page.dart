@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:rental_posting_app/screens/auth/login_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:rental_posting_app/config/api_config.dart';
+import 'package:rental_posting_app/providers/category_provider.dart';
+import 'package:rental_posting_app/providers/location_provider.dart';
+import 'package:rental_posting_app/providers/new_post_provider.dart';
 import 'package:rental_posting_app/screens/home/post_property_page.dart';
 import 'package:rental_posting_app/screens/home/profile_page.dart';
 
+import '../../config/format_function.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/highlight_post_provider.dart';
+import '../blog/blog_list_screen.dart';
+import '../price/price_table.dart';
 import 'category_page.dart';
 import 'filter_page.dart';
 import 'property_detail_page.dart';
@@ -18,10 +27,10 @@ class _BottomNavScreenState extends State<BottomNavScreen> {
   int _selectedIndex = 0;
 
   final List<Widget> _screens = [
-    HomePage(),
-    PostPropertyPage(),
-    ProfilePage(),
-    LoginScreen()
+    const HomePage(),
+    const PostPropertyPage(),
+    const BlogListScreen(),
+    const ProfilePage(),
   ];
 
   void _onTap(int index) {
@@ -46,8 +55,8 @@ class _BottomNavScreenState extends State<BottomNavScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Trang chủ'),
           BottomNavigationBarItem(
               icon: Icon(Icons.post_add), label: 'Đăng tin'),
+          BottomNavigationBarItem(icon: Icon(Icons.article), label: 'Bài viết'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Cá nhân'),
-          BottomNavigationBarItem(icon: Icon(Icons.logout), label: 'Đăng xuất'),
         ],
       ),
     );
@@ -63,293 +72,92 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _searchController = TextEditingController();
+  //theo dõi và điều khiển việc cuộn.
+  final ScrollController _highlightScrollController = ScrollController();
+  final ScrollController _newestScrollController = ScrollController();
 
-  // Promotion images for carousel
+  //theo dõi khi người dùng cuộn gần cuối danh sách để tự động tải thêm dữ liệu (lazy load).
+  @override
+  void initState() {
+    super.initState();
+
+    final highlightPostProvider =
+        Provider.of<HighlightPostProvider>(context, listen: false);
+
+    _highlightScrollController.addListener(() {
+      if (_highlightScrollController.position.pixels >=
+              _highlightScrollController.position.maxScrollExtent - 100 &&
+          !highlightPostProvider.isLoading &&
+          highlightPostProvider.hasMore) {
+        highlightPostProvider.fetchMorePosts();
+      }
+    });
+
+    final newPostProvider =
+        Provider.of<NewPostProvider>(context, listen: false);
+    _newestScrollController.addListener(() {
+      if (_newestScrollController.position.pixels >=
+              _newestScrollController.position.maxScrollExtent - 100 &&
+          !newPostProvider.isLoading &&
+          newPostProvider.hasMore) {
+        newPostProvider.fetchMorePosts();
+      }
+    });
+
+    Future.microtask(() {
+      if (!mounted) return;
+      final provider = Provider.of<CategoryProvider>(context, listen: false);
+      provider.fetchCategory();
+
+      final locationProvider =
+          Provider.of<LocationProvider>(context, listen: false);
+      locationProvider.fetchQhuyenLocation();
+      locationProvider.fetchPhuongXaLocation();
+      locationProvider.fetchHotLocations();
+    });
+  }
+
+  // hình ảnh cho carousel
   final List<String> promotionImages = [
     'assets/images/img1.jpg',
     'assets/images/img2.jpg',
     'assets/images/img3.jpg',
   ];
-  // Featured properties data
-  final List<Map<String, String>> featuredProperties = [
-    {
-      'image': 'assets/images/img1.jpg',
-      'title': 'Mới bằng Cao cấp, KDC Hồng Phát...',
-      'address': 'Xuân Thủy, Phường An Bình, Quận Ninh Kiều, Cần Thơ',
-      'price': '3.000.000 đ',
-      'discountedPrice': '1.500.000 đ',
-      'updateDate': 'Cập nhật: 2025-04-07',
-      'category': 'Nộp tiền',
-      'area': '50m²',
-      'level': '95',
-      'expiryDate': '2025-04-27',
-      'description':
-          'Phòng có cửa sổ hứng nắng sáng, gần trung tâm, đầy đủ tiện nghi.',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img2.jpg',
-      'title': 'Nhà trọ An Minh cao cấp 30 phòng...',
-      'address': 'Nguyen Văn Cừ, Phường An Hòa, Quận Ninh Kiều, Cần Thơ',
-      'price': '1.700.000 đ',
-      'discountedPrice': '3.500.000 đ',
-      'updateDate': 'Cập nhật: 2025-04-25',
-      'category': 'Cho thuê phòng trọ',
-      'area': '40m²',
-      'level': '96',
-      'expiryDate': '2025-05-25',
-      'description': 'Phòng có máy lạnh, gần Đại học, khu vực an ninh.',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img3.jpg',
-      'title': 'Căn hộ cao cấp trung tâm...',
-      'address': 'Phường Cái Khế, Quận Ninh Kiều, Cần Thơ',
-      'price': '2.500.000 đ',
-      'discountedPrice': '2.000.000 đ',
-      'updateDate': 'Cập nhật: 2025-04-10',
-      'category': 'Cho thuê nhà ở',
-      'area': '60m²',
-      'level': '97',
-      'expiryDate': '2025-05-10',
-      'description': 'Căn hộ cao cấp với vị trí đắc địa, đầy đủ tiện nghi.',
-      'district': 'Quận Ninh Kiều',
-    },
-  ];
-
-  // Latest properties data
-  final List<Map<String, String>> latestProperties = [
-    {
-      'image': 'assets/images/img1.jpg',
-      'title': 'Nhà trọ An Minh cao cấp 30 phòng...',
-      'address': 'Nguyen Văn Cừ, Phường An Hòa, Quận Ninh Kiều, Cần Thơ',
-      'price': '1.700.000 đ',
-      'discountedPrice': '3.500.000 đ',
-      'updateDate': 'Cập nhật: 2025-04-25',
-      'category': 'Cho thuê phòng trọ',
-      'area': '40m²',
-      'level': '96',
-      'expiryDate': '2025-05-25',
-      'description': 'Phòng có máy lạnh, gần Đại học, khu vực an ninh.',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img2.jpg',
-      'title': 'Mới bằng Cao cấp, KDC Hồng Phát...',
-      'address': 'Xuân Thủy, Phường An Bình, Quận Ninh Kiều, Cần Thơ',
-      'price': '3.000.000 đ',
-      'discountedPrice': '1.500.000 đ',
-      'updateDate': 'Cập nhật: 2025-04-07',
-      'category': 'Nộp tiền',
-      'area': '50m²',
-      'level': '95',
-      'expiryDate': '2025-04-27',
-      'description':
-          'Phòng có cửa sổ hứng nắng sáng, gần trung tâm, đầy đủ tiện nghi.',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img3.jpg',
-      'title': 'Phòng trọ sinh viên giá rẻ...',
-      'address': 'Phường Xuân Khánh, Quận Bình Thủy, Cần Thơ',
-      'price': '1.200.000 đ',
-      'discountedPrice': '1.000.000 đ',
-      'updateDate': 'Cập nhật: 2025-04-12',
-      'category': 'Cho thuê phòng trọ',
-      'area': '30m²',
-      'level': '94',
-      'expiryDate': '2025-05-12',
-      'description': 'Phòng trọ giá rẻ, phù hợp cho sinh viên, gần trường học.',
-      'district': 'Quận Bình Thủy',
-    },
-  ];
-
-  // Rental properties data
-  final List<Map<String, String>> rentalProperties = [
-    {
-      'image': 'assets/images/img1.jpg',
-      'category': 'Cho thuê phòng trọ',
-      'title': 'NHÀ TRỌ CAO CẤP 30M2, FULL NỘI THẤT, NĂM SAU LƯNG...',
-      'price': '1,000,000 đ',
-      'area': '50m²',
-      'updateDate': 'Cập nhật: 2025-04-07 10:22:17',
-      'address':
-          'CT1B2, hẻm 40, đường Võ Trường Toản, phường An Hòa, quận Ninh Kiều, Cần Thơ',
-      'level': '95',
-      'expiryDate': '2025-04-27',
-      'description':
-          'Phòng có cửa sổ hứng nắng sáng, gần Đại học Cộng thường, khu công nghiệp Tân Bình/Vĩnh Lộc/Bình Chánh, bến xe miền Tây,... Có sẵn bàn ghế, camera 24/24, xem thêm',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img2.jpg',
-      'category': 'Cho thuê phòng trọ',
-      'title': 'NHÀ TRỌ CÓ MÁY LẠNH GẦN ĐẠI HỌC KỸ THUẬT CÔNG NG...',
-      'price': '1,700,000 đ',
-      'area': '40m²',
-      'updateDate': 'Cập nhật: 2025-03-07 12:22:17',
-      'address':
-          'A78, hẻm 42, đường Võ Trường Toản, phường An Hòa, quận Ninh Kiều, Cần Thơ',
-      'level': '96',
-      'expiryDate': '2025-03-27',
-      'description':
-          'Phòng có máy lạnh, gần Đại học Kỹ thuật Công nghệ, khu dân cư yên tĩnh, an ninh tốt. Có sẵn bàn ghế, tủ quần áo, camera 24/24, xem thêm',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img3.jpg',
-      'category': 'Cho thuê phòng trọ',
-      'title': 'NHÀ TRỌ HƯNG THỊNH PHÁT CÓ 70 PHÒNG ĐẦY ĐỦ TIỆN NG...',
-      'price': '2,100,000 đ',
-      'area': '50m²',
-      'updateDate': 'Cập nhật: 2025-05-07 11:22:17',
-      'address': 'đường Võ Trường Toản, phường An Hòa, quận Ninh Kiều, Cần Thơ',
-      'level': '97',
-      'expiryDate': '2025-05-27',
-      'description':
-          'Nhà trọ cao cấp với 70 phòng, đầy đủ tiện nghi, gần trung tâm thành phố, khu vực an ninh. Có sẵn bàn ghế, giường, tủ, camera 24/24, xem thêm',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img4.jpg',
-      'category': 'Cho thuê phòng trọ',
-      'title': 'NHÀ TRỎ THIÊN AN 5 ĐẦY PHÒNG CHO SINH VIÊN, NGƯỜI ĐI LÀM...',
-      'price': '1,700,000 đ',
-      'area': '50m²',
-      'updateDate': 'Cập nhật: 2025-04-23 09:22:17',
-      'address':
-          'Hẻm 233, Nguyễn Văn Cừ, phường An Hòa, quận Ninh Kiều, Cần Thơ',
-      'level': '94',
-      'expiryDate': '2025-05-23',
-      'description':
-          'Nhà trọ Thiên An với 5 phòng, phù hợp cho sinh viên và người đi làm, gần trường học và khu công nghiệp. Có sẵn bàn ghế, giường, camera 24/24, xem thêm',
-      'district': 'Quận Ninh Kiều',
-    },
-  ];
-
-  // Payment properties data
-  final List<Map<String, String>> paymentProperties = [
-    {
-      'image': 'assets/images/img1.jpg',
-      'category': 'Nộp tiền',
-      'title': 'NỘP TIỀN THUÊ NHÀ TRỌ CAO CẤP 30M2...',
-      'price': '1,000,000 đ',
-      'area': '50m²',
-      'updateDate': 'Cập nhật: 2025-04-07 10:22:17',
-      'address':
-          'CT1B2, hẻm 40, đường Võ Trường Toản, phường An Hòa, quận Ninh Kiều, Cần Thơ',
-      'level': '95',
-      'expiryDate': '2025-04-27',
-      'description':
-          'Nộp tiền thuê nhà trọ cao cấp, gần trung tâm, đầy đủ tiện nghi. Có sẵn bàn ghế, camera 24/24, xem thêm',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img2.jpg',
-      'category': 'Nộp tiền',
-      'title': 'NỘP TIỀN NHÀ TRỌ CÓ MÁY LẠNH GẦN ĐẠI HỌC...',
-      'price': '1,700,000 đ',
-      'area': '40m²',
-      'updateDate': 'Cập nhật: 2025-03-07 12:22:17',
-      'address':
-          'A78, hẻm 42, đường Võ Trường Toản, phường An Hòa, quận Ninh Kiều, Cần Thơ',
-      'level': '96',
-      'expiryDate': '2025-03-27',
-      'description':
-          'Nộp tiền nhà trọ có máy lạnh, gần Đại học, khu vực an ninh. Có sẵn bàn ghế, tủ quần áo, camera 24/24, xem thêm',
-      'district': 'Quận Ninh Kiều',
-    },
-  ];
-
-  // Commercial properties data
-  final List<Map<String, String>> commercialProperties = [
-    {
-      'image': 'assets/images/img1.jpg',
-      'category': 'Cho thuê mặt bằng',
-      'title': 'CHO THUÊ MẶT BẰNG KINH DOANH 70M2...',
-      'price': '5,000,000 đ',
-      'area': '70m²',
-      'updateDate': 'Cập nhật: 2025-05-07 11:22:17',
-      'address': 'đường Võ Trường Toản, phường An Hòa, quận Ninh Kiều, Cần Thơ',
-      'level': '97',
-      'expiryDate': '2025-05-27',
-      'description':
-          'Mặt bằng kinh doanh rộng 70m², vị trí đắc địa, gần trung tâm, phù hợp mở cửa hàng, văn phòng. Có sẵn camera 24/24, xem thêm',
-      'district': 'Quận Ninh Kiều',
-    },
-    {
-      'image': 'assets/images/img2.jpg',
-      'category': 'Cho thuê mặt bằng',
-      'title': 'MẶT BẰNG ĐẸP GẦN TRUNG TÂM 50M2...',
-      'price': '3,500,000 đ',
-      'area': '50m²',
-      'updateDate': 'Cập nhật: 2025-04-23 09:22:17',
-      'address':
-          'Hẻm 233, Nguyễn Văn Cừ, phường An Hòa, quận Cái Răng, Cần Thơ',
-      'level': '94',
-      'expiryDate': '2025-05-23',
-      'description':
-          'Mặt bằng đẹp, gần trung tâm, diện tích 50m², phù hợp kinh doanh nhỏ. Có sẵn camera 24/24, xem thêm',
-      'district': 'Quận Cái Răng',
-    },
-  ];
-
-  // Combine all properties for search and "View All"
-  List<Map<String, String>> getAllProperties() {
-    return [
-      ...rentalProperties,
-      ...paymentProperties,
-      ...commercialProperties,
-    ];
-  }
-
-  // Search properties by keyword
-  List<Map<String, String>> searchProperties(String keyword) {
-    final allProperties = getAllProperties();
-    if (keyword.isEmpty) return allProperties;
-    return allProperties.where((property) {
-      final title = property['title']?.toLowerCase() ?? '';
-      final address = property['address']?.toLowerCase() ?? '';
-      final description = property['description']?.toLowerCase() ?? '';
-      final searchLower = keyword.toLowerCase();
-      return title.contains(searchLower) ||
-          address.contains(searchLower) ||
-          description.contains(searchLower);
-    }).toList();
-  }
-
-  // Filter properties by category
-  List<Map<String, String>> filterByCategory(String category) {
-    final allProperties = getAllProperties();
-    if (category == 'ALL') return allProperties;
-    final categoryMapping = {
-      'Mới bằng': 'Nộp tiền',
-      'Nhà ở': 'Cho thuê nhà ở',
-      'Thuê trọ': 'Cho thuê phòng trọ',
-    };
-    final mappedCategory = categoryMapping[category] ?? category;
-    return allProperties
-        .where((property) => property['category'] == mappedCategory)
-        .toList();
-  }
-
-  // Filter properties by district
-  List<Map<String, String>> filterByDistrict(String district) {
-    final allProperties = getAllProperties();
-    return allProperties
-        .where((property) => property['district'] == district)
-        .toList();
-  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _highlightScrollController.dispose();
+    _newestScrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+
+    final highlightPostProvider = Provider.of<HighlightPostProvider>(context);
+    final highlightPosts = highlightPostProvider.posts;
+
+    final newestPostProvider = Provider.of<NewPostProvider>(context);
+    final newestPosts = newestPostProvider.posts;
+
+    final locationProvider = Provider.of<LocationProvider>(context);
+    final highlightLocations = locationProvider.locations;
+
+    final categoryProvider = Provider.of<CategoryProvider>(context);
+    final categorys = categoryProvider.categorys;
+
+    List<IconData> categoryIcons = [
+      Icons.apartment,
+      Icons.house,
+      Icons.store,
+      Icons.group,
+      Icons.business,
+      Icons.article,
+    ];
     return Scaffold(
       key: _scaffoldKey,
       drawer: Drawer(
@@ -365,58 +173,35 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Image.asset(
-                        'assets/images/logo.png',
-                        height: 40,
-                        width: 40,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(
-                          Icons.apartment,
-                          color: Colors.white,
-                          size: 40,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundImage:
+                              (user?.anhdaidien?.isNotEmpty ?? false)
+                                  ? NetworkImage(FormatFunction.buildAvatarUrl(
+                                      user!.anhdaidien!))
+                                  : null,
+                          backgroundColor: Colors.grey,
+                          child: (user?.anhdaidien?.isEmpty ?? true)
+                              ? const Icon(Icons.person,
+                                  size: 24, color: Colors.white)
+                              : null,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'STAYCONNECT\nTHẢ GA LỰA CHỌN',
-                          style: TextStyle(
+                        const SizedBox(width: 12),
+                        Text(
+                          user?.ten ?? 'Ẩn danh',
+                          style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
-                          softWrap: true,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundImage: AssetImage('assets/images/img1.jpg'),
-                        child: Icon(
-                          Icons.person,
-                          size: 24,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        "user!.ten",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  )
                 ],
               ),
             ),
@@ -427,76 +212,49 @@ class _HomePageState extends State<HomePage> {
                 Navigator.pop(context);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.apartment, color: Colors.grey),
-              title: const Text('Thuê phòng trọ'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CategoryPage(
-                      title: 'Cho thuê nhà trọ',
-                      properties: rentalProperties,
-                    ),
+            Column(
+              children: List.generate(categorys.length, (index) {
+                final category = categorys[index];
+                final icon = categoryIcons.length > index
+                    ? categoryIcons[index]
+                    : Icons.category;
+                return ListTile(
+                  leading: Icon(
+                    icon,
+                    color: Colors.grey,
                   ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.house, color: Colors.grey),
-              title: const Text('Thuê nhà ở'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CategoryPage(
-                      title: 'Cho thuê nhà ở',
-                      properties: filterByCategory('Nhà ở'),
-                    ),
+                  title: Text(
+                    category.ten,
                   ),
+                  onTap: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CategoryPage(
+                            title: category.ten,
+                            categoryId: [category.id],
+                            keyWord: '',
+                            dientich: const [],
+                            mucgia: const [],
+                            phuongxa: const [],
+                            qhuyen: const [],
+                            noiBat: false,
+                            moiNhat: false,
+                          ),
+                        ));
+                  },
                 );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.store, color: Colors.grey),
-              title: const Text('Thuê mặt bằng'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CategoryPage(
-                      title: 'Cho thuê mặt bằng',
-                      properties: commercialProperties,
-                    ),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.group, color: Colors.grey),
-              title: const Text('Ở ghép'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chuyển đến mục Ở ghép')),
-                );
-              },
+              }),
             ),
             ListTile(
               leading: const Icon(Icons.monetization_on, color: Colors.grey),
-              title: const Text('Bằng giá'),
+              title: const Text('Bảng giá'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CategoryPage(
-                      title: 'Nộp tiền',
-                      properties: paymentProperties,
-                    ),
+                    builder: (context) => BangGiaScreen(),
                   ),
                 );
               },
@@ -505,16 +263,17 @@ class _HomePageState extends State<HomePage> {
               leading: const Icon(Icons.article, color: Colors.grey),
               title: const Text('Bài viết'),
               onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Chuyển đến mục Bài viết')),
-                );
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BlogListScreen(),
+                    ));
               },
             ),
             const Divider(),
             ListTile(
               title: const Text(
-                'XEM TẤT CẢ',
+                'XEM TẤT CẢ BÀI ĐĂNG',
                 style: TextStyle(
                   color: Colors.blue,
                   fontWeight: FontWeight.bold,
@@ -522,16 +281,21 @@ class _HomePageState extends State<HomePage> {
               ),
               trailing: const Icon(Icons.arrow_forward, color: Colors.blue),
               onTap: () {
-                Navigator.pop(context);
                 Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CategoryPage(
-                      title: 'Tất cả tin đăng',
-                      properties: getAllProperties(),
-                    ),
-                  ),
-                );
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CategoryPage(
+                        title: 'Tất cả tin đăng',
+                        categoryId: [-2],
+                        keyWord: '',
+                        dientich: [],
+                        mucgia: [],
+                        phuongxa: [],
+                        qhuyen: [],
+                        noiBat: false,
+                        moiNhat: false,
+                      ),
+                    ));
               },
             ),
             ListTile(
@@ -547,22 +311,6 @@ class _HomePageState extends State<HomePage> {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Pass đồ cũ')),
-                );
-              },
-            ),
-            ListTile(
-              title: const Text(
-                'XEM CHI TIẾT',
-                style: TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              trailing: const Icon(Icons.arrow_forward, color: Colors.blue),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Xem chi tiết')),
                 );
               },
             ),
@@ -585,7 +333,8 @@ class _HomePageState extends State<HomePage> {
                       child: Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.menu, color: Colors.teal),
+                            icon: Icon(Icons.menu,
+                                color: theme.colorScheme.primary),
                             onPressed: () {
                               _scaffoldKey.currentState?.openDrawer();
                             },
@@ -596,7 +345,7 @@ class _HomePageState extends State<HomePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "user.ten",
+                                  user?.ten ?? "",
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.bold,
@@ -620,8 +369,8 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.notifications_outlined,
-                          color: Colors.teal),
+                      icon: Icon(Icons.notifications_outlined,
+                          color: theme.colorScheme.primary),
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -632,14 +381,18 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ],
                 ),
+
+                // Phần Search
                 const SizedBox(height: 16),
                 TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search for...',
-                    prefixIcon: const Icon(Icons.search, color: Colors.teal),
+                    hintText: 'Tìm kiếm...',
+                    prefixIcon:
+                        Icon(Icons.search, color: theme.colorScheme.primary),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.filter_list, color: Colors.teal),
+                      icon: Icon(Icons.filter_list,
+                          color: theme.colorScheme.primary),
                       onPressed: () {
                         Navigator.push(
                           context,
@@ -657,16 +410,21 @@ class _HomePageState extends State<HomePage> {
                   ),
                   onSubmitted: (value) {
                     if (value.isNotEmpty) {
-                      final searchResults = searchProperties(value);
                       Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CategoryPage(
-                            title: 'Kết quả tìm kiếm: $value',
-                            properties: searchResults,
-                          ),
-                        ),
-                      );
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CategoryPage(
+                              title: 'Kết quả tìm kiếm',
+                              categoryId: [-2],
+                              keyWord: value,
+                              dientich: [],
+                              mucgia: [],
+                              phuongxa: [],
+                              qhuyen: [],
+                              noiBat: false,
+                              moiNhat: false,
+                            ),
+                          ));
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -675,6 +433,8 @@ class _HomePageState extends State<HomePage> {
                     }
                   },
                 ),
+
+                // Phần Carousel
                 const SizedBox(height: 16),
                 // SizedBox(
                 //   height: 180,
@@ -716,6 +476,7 @@ class _HomePageState extends State<HomePage> {
                 //     }).toList(),
                 //   ),
                 // ),
+                // Phần danh mục tìm kiếm
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -733,9 +494,16 @@ class _HomePageState extends State<HomePage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => CategoryPage(
+                            builder: (context) => const CategoryPage(
                               title: 'Tất cả danh mục',
-                              properties: getAllProperties(),
+                              categoryId: [-1],
+                              keyWord: '',
+                              qhuyen: [],
+                              phuongxa: [],
+                              mucgia: [],
+                              dientich: [],
+                              noiBat: false,
+                              moiNhat: false,
                             ),
                           ),
                         );
@@ -758,44 +526,31 @@ class _HomePageState extends State<HomePage> {
                     scrollDirection: Axis.horizontal,
                     physics: const ClampingScrollPhysics(),
                     child: Row(
-                      children: [
-                        _buildCategoryText('Cho thuê nhà trọ', () {
+                      children: categorys.map((category) {
+                        return _buildCategoryText(category.ten, () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => CategoryPage(
-                                title: 'Cho thuê nhà trọ',
-                                properties: rentalProperties,
+                                title: category.ten,
+                                categoryId: [category.id],
+                                keyWord: '',
+                                dientich: [],
+                                mucgia: [],
+                                phuongxa: [],
+                                qhuyen: [],
+                                noiBat: false,
+                                moiNhat: false,
                               ),
                             ),
                           );
-                        }),
-                        _buildCategoryText('Nộp tiền', () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CategoryPage(
-                                title: 'Nộp tiền',
-                                properties: paymentProperties,
-                              ),
-                            ),
-                          );
-                        }),
-                        _buildCategoryText('Cho thuê mặt bằng', () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CategoryPage(
-                                title: 'Cho thuê mặt bằng',
-                                properties: commercialProperties,
-                              ),
-                            ),
-                          );
-                        }),
-                      ],
+                        });
+                      }).toList(),
                     ),
                   ),
                 ),
+
+                //Phần tin nổi bật
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -813,15 +568,22 @@ class _HomePageState extends State<HomePage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => CategoryPage(
-                              title: 'Tin nổi bật',
-                              properties: featuredProperties,
+                            builder: (context) => const CategoryPage(
+                              title: 'Tất cả tin nổi bật',
+                              categoryId: [-2],
+                              keyWord: '',
+                              dientich: [],
+                              mucgia: [],
+                              phuongxa: [],
+                              qhuyen: [],
+                              noiBat: true,
+                              moiNhat: false,
                             ),
                           ),
                         );
                       },
                       child: const Text(
-                        'Xem chi tiết',
+                        'Xem tất cả',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.blue,
@@ -832,108 +594,63 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                // SizedBox(
-                //   height: 40,
-                //   child: SingleChildScrollView(
-                //     scrollDirection: Axis.horizontal,
-                //     physics: const ClampingScrollPhysics(),
-                //     child: Row(
-                //       children: [
-                //         const SizedBox(width: 4),
-                //         _buildCategoryTab('ALL', _selectedCategory == 'ALL',
-                //             () {
-                //           setState(() {
-                //             _selectedCategory = 'ALL';
-                //           });
-                //           Navigator.push(
-                //             context,
-                //             MaterialPageRoute(
-                //               builder: (context) => CategoryPage(
-                //                 title: 'Tin nổi bật - Tất cả',
-                //                 properties: filterByCategory('ALL'),
-                //               ),
-                //             ),
-                //           );
-                //         }),
-                //         _buildCategoryTab(
-                //             'Mới bằng', _selectedCategory == 'Mới bằng', () {
-                //           setState(() {
-                //             _selectedCategory = 'Mới bằng';
-                //           });
-                //           Navigator.push(
-                //             context,
-                //             MaterialPageRoute(
-                //               builder: (context) => CategoryPage(
-                //                 title: 'Tin nổi bật - Mới bằng',
-                //                 properties: filterByCategory('Mới bằng'),
-                //               ),
-                //             ),
-                //           );
-                //         }),
-                //         _buildCategoryTab('Nhà ở', _selectedCategory == 'Nhà ở',
-                //             () {
-                //           setState(() {
-                //             _selectedCategory = 'Nhà ở';
-                //           });
-                //           Navigator.push(
-                //             context,
-                //             MaterialPageRoute(
-                //               builder: (context) => CategoryPage(
-                //                 title: 'Tin nổi bật - Nhà ở',
-                //                 properties: filterByCategory('Nhà ở'),
-                //               ),
-                //             ),
-                //           );
-                //         }),
-                //         _buildCategoryTab(
-                //             'Thuê trọ', _selectedCategory == 'Thuê trọ', () {
-                //           setState(() {
-                //             _selectedCategory = 'Thuê trọ';
-                //           });
-                //           Navigator.push(
-                //             context,
-                //             MaterialPageRoute(
-                //               builder: (context) => CategoryPage(
-                //                 title: 'Tin nổi bật - Thuê trọ',
-                //                 properties: filterByCategory('Thuê trọ'),
-                //               ),
-                //             ),
-                //           );
-                //         }),
-                //         const SizedBox(width: 4),
-                //       ],
-                //     ),
-                //   ),
-                // ),
-                const SizedBox(height: 8),
                 SizedBox(
                   height: 350,
                   child: ListView.builder(
+                    controller: _highlightScrollController,
                     scrollDirection: Axis.horizontal,
-                    itemCount: featuredProperties.length,
+                    itemCount: highlightPosts.length +
+                        (highlightPostProvider.isLoading ? 1 : 0),
                     itemBuilder: (context, index) {
-                      final property = featuredProperties[index];
-                      return SizedBox(
-                        child: _buildPropertyCard(
-                          context: context,
-                          image: property['image']!,
-                          title: property['title']!,
-                          address: property['address']!,
-                          price: property['price']!,
-                          discountedPrice: property['discountedPrice']!,
-                          updateDate: property['updateDate']!,
-                          category: property['category']!,
-                          area: property['area']!,
-                          level: property['level']!,
-                          expiryDate: property['expiryDate']!,
-                          description: property['description']!,
-                        ),
-                      );
+                      if (index < highlightPosts.length) {
+                        final post = highlightPosts[index];
+                        return SizedBox(
+                          child: _buildPropertyCard(
+                              context: context,
+                              image: post.anhdaidien != null
+                                  ? FormatFunction.buildAvatarUrl(
+                                      post.anhdaidien ?? "")
+                                  : "${ApiConfig.baseUrl}/images/news-1.jpg",
+                              title: post.ten ?? "",
+                              address: post.city?.ten ?? "",
+                              price: post.gia.toString(),
+                              discountedPrice: "",
+                              updateDate: FormatFunction.formatDate(
+                                  post.createdAt.toString()),
+                              category: post.category.ten,
+                              area: post.khuvuc.toString(),
+                              level: "#${post.id}",
+                              expiryDate: FormatFunction.formatDate(
+                                  post.thoigian_ketthuc.toString()),
+                              description: post.mota ?? "",
+                              star: post.dichvu_hot,
+                              chitietdiachi: post.chitietdiachi ?? "",
+                              idPhong: post.id,
+                              khuVuc:
+                                  "${post.wards?.ten} / ${post.district?.ten}",
+                              latitude: FormatFunction.parseCoordinates(
+                                      post.map ?? '')
+                                  .latitude,
+                              longitude: FormatFunction.parseCoordinates(
+                                      post.map ?? '')
+                                  .longitude),
+                        );
+                      } else {
+                        return const SizedBox(
+                          width: 250,
+                          child: Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
                     },
                   ),
                 ),
 
-                const SizedBox(height: 16),
+                // Phần tin đăng mới nhất
+                const SizedBox(
+                  height: 16,
+                ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -950,15 +667,22 @@ class _HomePageState extends State<HomePage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => CategoryPage(
-                              title: 'Tin đăng mới nhất',
-                              properties: latestProperties,
+                            builder: (context) => const CategoryPage(
+                              title: 'Tất cả tin mới nhất',
+                              categoryId: [-2],
+                              keyWord: '',
+                              dientich: [],
+                              mucgia: [],
+                              phuongxa: [],
+                              qhuyen: [],
+                              noiBat: false,
+                              moiNhat: true,
                             ),
                           ),
                         );
                       },
                       child: const Text(
-                        'Xem chi tiết',
+                        'Xem tất cả',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.blue,
@@ -969,38 +693,60 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                // SizedBox(
-                //   height: 130,
-                //   child: FlutterCarousel(
-                //     options: CarouselOptions(
-                //       height: 130,
-                //       autoPlay: true,
-                //       autoPlayInterval: const Duration(seconds: 3),
-                //       enlargeCenterPage: true,
-                //       viewportFraction: 0.9,
-                //       showIndicator: true,
-                //       slideIndicator: const CircularSlideIndicator(),
-                //     ),
-                //     items: latestProperties.map((property) {
-                //       return GestureDetector(
-                //         child: _buildPropertyCard(
-                //           context: context,
-                //           image: property['image']!,
-                //           title: property['title']!,
-                //           address: property['address']!,
-                //           price: property['price']!,
-                //           discountedPrice: property['discountedPrice']!,
-                //           updateDate: property['updateDate']!,
-                //           category: property['category']!,
-                //           area: property['area']!,
-                //           level: property['level']!,
-                //           expiryDate: property['expiryDate']!,
-                //           description: property['description']!,
-                //         ),
-                //       );
-                //     }).toList(),
-                //   ),
-                // ),
+                SizedBox(
+                  height: 350,
+                  child: ListView.builder(
+                    controller: _newestScrollController,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: newestPosts.length +
+                        (newestPostProvider.isLoading ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index < newestPosts.length) {
+                        final newestPost = newestPosts[index];
+                        return SizedBox(
+                          child: _buildPropertyCard(
+                              context: context,
+                              image: newestPost.anhdaidien != null
+                                  ? FormatFunction.buildAvatarUrl(
+                                      newestPost.anhdaidien ?? "")
+                                  : "${ApiConfig.baseUrl}/images/news-1.jpg",
+                              title: newestPost.ten ?? "",
+                              address: newestPost.city?.ten ?? "",
+                              price: newestPost.gia.toString(),
+                              discountedPrice: "",
+                              updateDate: FormatFunction.formatDate(
+                                  newestPost.createdAt.toString()),
+                              category: newestPost.category.ten,
+                              area: newestPost.khuvuc.toString(),
+                              level: "#${newestPost.id}",
+                              expiryDate: FormatFunction.formatDate(
+                                  newestPost.thoigian_ketthuc.toString()),
+                              description: newestPost.mota ?? "",
+                              star: newestPost.dichvu_hot,
+                              chitietdiachi: newestPost.chitietdiachi ?? "",
+                              idPhong: newestPost.id,
+                              khuVuc:
+                                  "${newestPost.wards?.ten} / ${newestPost.district?.ten}",
+                              latitude: FormatFunction.parseCoordinates(
+                                      newestPost.map ?? '')
+                                  .latitude,
+                              longitude: FormatFunction.parseCoordinates(
+                                      newestPost.map ?? '')
+                                  .longitude),
+                        );
+                      } else {
+                        return const SizedBox(
+                          width: 250,
+                          child: Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+
+                // Phần khu vực nổi bật
                 const SizedBox(height: 16),
                 const Text(
                   'Khu vực nổi bật',
@@ -1010,42 +756,56 @@ class _HomePageState extends State<HomePage> {
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 8),
-                _buildAreaCard('Quận Bình Thủy', 'assets/images/img1.jpg', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CategoryPage(
-                        title: 'Tin tại Quận Bình Thủy',
-                        properties: filterByDistrict('Quận Bình Thủy'),
-                      ),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 8),
-                _buildAreaCard('Quận Ninh Kiều', 'assets/images/img2.jpg', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CategoryPage(
-                        title: 'Tin tại Quận Ninh Kiều',
-                        properties: filterByDistrict('Quận Ninh Kiều'),
-                      ),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 8),
-                _buildAreaCard('Quận Cái Răng', 'assets/images/img3.jpg', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CategoryPage(
-                        title: 'Tin tại Quận Cái Răng',
-                        properties: filterByDistrict('Quận Cái Răng'),
-                      ),
-                    ),
-                  );
-                }),
+                Column(
+                  children: highlightLocations.map((location) {
+                    return _buildAreaCard(
+                      location.ten,
+                      FormatFunction.buildAvatarUrl(location.anhdaidien ?? ""),
+                      () {
+                        List<int> qhuyen = [];
+                        List<int> phuongxa = [];
+
+                        if (location.loai == 1) {
+                          qhuyen = [location.id];
+                        } else if (location.loai == 2) {
+                          phuongxa = [location.id];
+                        }
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CategoryPage(
+                              title: location.ten,
+                              categoryId: const [-1],
+                              qhuyen: qhuyen,
+                              phuongxa: phuongxa,
+                              mucgia: const [],
+                              dientich: const [],
+                              keyWord: '',
+                              noiBat: false,
+                              moiNhat: false,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }).toList(),
+                ),
+
+                //Sửa lại phần Route cho  khu vực nổi bật
+
+                // const SizedBox(height: 8),
+                // _buildAreaCard('Quận Bình Thủy', 'assets/images/img1.jpg', () {
+                //   Navigator.push(
+                //     context,
+                //     MaterialPageRoute(
+                //       builder: (context) => CategoryPage(
+                //         title: 'Tin tại Quận Bình Thủy',
+                //         properties: filterByDistrict('Quận Bình Thủy'),
+                //       ),
+                //     ),
+                //   );
+                // }),
               ],
             ),
           ),
@@ -1087,20 +847,25 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildPropertyCard({
-    required BuildContext context,
-    required String image,
-    required String title,
-    required String address,
-    required String price,
-    required String discountedPrice,
-    required String updateDate,
-    required String category,
-    required String area,
-    required String level,
-    required String expiryDate,
-    required String description,
-  }) {
+  Widget _buildPropertyCard(
+      {required BuildContext context,
+      required String image,
+      required String title,
+      required String address,
+      required String price,
+      required String discountedPrice,
+      required String updateDate,
+      required String category,
+      required String area,
+      required String level,
+      required String expiryDate,
+      required String description,
+      required int star,
+      required String chitietdiachi,
+      required int idPhong,
+      required String khuVuc,
+      required double latitude,
+      required double longitude}) {
     final theme = Theme.of(context);
     return GestureDetector(
         onTap: () {
@@ -1111,13 +876,18 @@ class _HomePageState extends State<HomePage> {
                 image: image,
                 category: category,
                 title: title,
-                address: address,
+                address: chitietdiachi,
                 price: price,
                 area: area,
                 level: level,
                 updateDate: updateDate,
                 expiryDate: expiryDate,
                 description: description,
+                idPhong: idPhong,
+                star: star,
+                khuVuc: khuVuc,
+                latitude: latitude,
+                longitude: longitude,
               ),
             ),
           );
@@ -1135,34 +905,53 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: const BorderRadius.only(
                       topRight: Radius.circular(12),
                       topLeft: Radius.circular(12)),
-                  child: Image.asset(
+                  child: Image.network(
                     image,
                     height: 180,
                     fit: BoxFit.cover,
                     width: double.infinity,
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 14.0),
-                  child: Icon(
-                    Icons.star,
-                    color: Colors.yellow,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                  child: SizedBox(
+                    height: 20,
+                    child: Row(
+                      children: [
+                        Row(
+                          children: List.generate(
+                              star,
+                              (index) => const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 0),
+                                    child: Icon(
+                                      Icons.star,
+                                      color: Colors.yellow,
+                                      size: 20,
+                                    ),
+                                  )),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 14.0, vertical: 0),
                   child: Text(
                     title,
-                    style: const TextStyle(
-                        color: Color(0xffFF6B00), fontWeight: FontWeight.bold),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: FormatFunction.formatTitle(star),
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6),
                   child: Text(
-                    address,
+                    chitietdiachi,
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
@@ -1176,7 +965,8 @@ class _HomePageState extends State<HomePage> {
                       RichText(
                           text: TextSpan(children: [
                         TextSpan(
-                            text: "3.000.000 VNĐ",
+                            text: FormatFunction.formatPrice(
+                                int.parse(price).toString()),
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.blue,
                               fontWeight: FontWeight.bold,
@@ -1189,7 +979,8 @@ class _HomePageState extends State<HomePage> {
                             style: theme.textTheme.bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.bold)),
                         TextSpan(
-                            text: " 150m", style: theme.textTheme.bodyMedium)
+                            text: " $area m\u00B2",
+                            style: theme.textTheme.bodyMedium)
                       ])),
                     ],
                   ),
@@ -1204,7 +995,7 @@ class _HomePageState extends State<HomePage> {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
-        height: 150,
+        height: 200,
         child: Card(
           elevation: 2,
           shape:
@@ -1213,13 +1004,13 @@ class _HomePageState extends State<HomePage> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12.0),
-                child: Image.asset(
+                child: Image.network(
                   image,
-                  height: 150,
+                  height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
-                    height: 150,
+                    height: 200,
                     width: double.infinity,
                     color: Colors.grey[300],
                     child: const Icon(Icons.error, size: 40),

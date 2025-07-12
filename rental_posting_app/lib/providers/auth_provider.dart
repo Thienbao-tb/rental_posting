@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../models/user_model.dart';
@@ -5,7 +7,8 @@ import '../services/auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
-
+  Map<String, dynamic>? _errorDetails;
+  Map<String, dynamic>? get errorDetails => _errorDetails;
   bool _isLoading = false;
   bool _isAuthenticated = false;
   String? _error;
@@ -39,14 +42,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> register(String name, String email, String password,
       String confirmPassword, String sdt) async {
     _setLoading(true);
-    print("tới provider");
-    print('''
-    Họ tên: ${name}
-    Email: ${email.trim()}
-    Mật khẩu: ${password}
-    Xác nhận mật khẩu: ${confirmPassword}
-    Số điện thoại: ${sdt}
-    ''');
+
     final result = await _authService.register(
         name, email, password, confirmPassword, sdt);
 
@@ -102,6 +98,67 @@ class AuthProvider extends ChangeNotifier {
     _user = null;
     _isAuthenticated = false;
     _setLoading(false);
+  }
+
+  Future<Map<String, dynamic>> updateUserInfo({
+    required String ten,
+    required String email,
+    required String sodienthoai,
+    File? avatarFile,
+  }) async {
+    _setLoading(true);
+    _error = null;
+    _errorDetails = null;
+
+    final result = await _authService.updateUserInfo(
+      ten: ten,
+      email: email,
+      sodienthoai: sodienthoai,
+      avatarFile: avatarFile,
+    );
+
+    if (result['success']) {
+      final refreshResult = await _authService.getUser();
+      if (refreshResult['success']) {
+        _user = refreshResult['user'];
+      }
+    } else {
+      _errorDetails = result['errors'];
+    }
+
+    _setLoading(false);
+    notifyListeners();
+
+    return result;
+  }
+
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    _setLoading(true);
+    _error = null;
+    _errorDetails = null;
+
+    final result = await _authService.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+      newPasswordConfirmation: newPasswordConfirmation,
+    );
+    print(result['success']);
+    print(result['message']);
+    print(result['errors']);
+    if (result['success']) {
+      // Nếu đổi mật khẩu thành công thì không cần cập nhật user
+    } else {
+      _error = result['message'];
+      _errorDetails = result['errors'];
+    }
+
+    _setLoading(false);
+    notifyListeners();
+    return result;
   }
 
   void _setLoading(bool value) {

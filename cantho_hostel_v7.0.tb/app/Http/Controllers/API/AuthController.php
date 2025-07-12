@@ -104,7 +104,6 @@ class AuthController extends Controller
             'user' => $request->user()
         ], 200);
     }
-
     /**
      * Đăng xuất người dùng
      */
@@ -132,4 +131,118 @@ class AuthController extends Controller
              'success' => true
         ]);
     }
+
+    public function updateUserInfo(Request $request)
+    {
+        $user = $request->user(); // lấy user từ token
+
+        $validator = Validator::make($request->all(), [
+            'ten' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:nguoidung,email,' . $user->id,
+            'sodienthoai' => 'nullable|string|max:20|unique:nguoidung,sodienthoai,' . $user->id,
+            'anhdaidien' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user->ten = $request->ten;
+        $user->email = $request->email;
+        $user->sodienthoai = $request->sodienthoai;
+
+        if ($request->hasFile('anhdaidien')) {
+        $file = $request->file('anhdaidien');
+
+        // Lấy ngày tháng năm hiện tại
+        $now = now();
+        $year = $now->format('Y');
+        $month = $now->format('m');
+        $day = $now->format('d');
+
+        // Tạo thư mục nếu chưa có
+        $folderPath = public_path("uploads/$year/$month/$day");
+        if (!file_exists($folderPath)) {
+            mkdir($folderPath, 0775, true);
+        }
+
+        // Đặt tên file theo định dạng: 2025-07-08__dsc02763.jpg
+        $originalName = $file->getClientOriginalName();
+        $today = $now->format('Y-m-d');
+        $fileName = $today . '__' . $originalName;
+
+        $file->move($folderPath, $fileName);
+
+        // Xoá ảnh cũ nếu có
+        if ($user->anhdaidien && file_exists(public_path('uploads/' . $user->anhdaidien))) {
+            @unlink(public_path('uploads/' . $user->anhdaidien));
+        }
+
+        // Lưu path theo cấu trúc uploads/2025/07/08/2025-07-08__dsc02763.jpg
+        $user->anhdaidien = "$fileName";
+    }
+
+        $user->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Cập nhật thành công',
+            'user' => $user,
+        ]);
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $user = $request->user(); // Lấy user từ token
+
+        // Validate đầu vào
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required|string',
+            'new_password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed', // yêu cầu phải có trường new_password_confirmation
+            ],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Kiểm tra mật khẩu hiện tại
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Mật khẩu hiện tại không đúng',
+                'errors' => [
+                    'current_password' => ['Mật khẩu hiện tại không đúng'],
+                ],
+            ], 422);
+        }
+
+        // Cập nhật mật khẩu mới
+        $user->password = Hash::make($request->new_password);
+        $user->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Đổi mật khẩu thành công',
+        ]);
+    }
+
+
+
+
+
+
+
 }

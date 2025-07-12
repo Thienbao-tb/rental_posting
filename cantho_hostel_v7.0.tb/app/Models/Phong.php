@@ -70,4 +70,8 @@ class Phong extends Model
     {
         return $this->hasMany(LichSuThanhToan::class, 'phong_id');
     }
+    public function user()
+    {
+        return $this->belongsTo(NguoiDung::class, 'xacthuc_id');
+    }
 }

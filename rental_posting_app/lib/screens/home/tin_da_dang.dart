@@ -1,205 +1,283 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:rental_posting_app/config/format_function.dart';
+import 'package:rental_posting_app/providers/auth_provider.dart';
+import 'package:rental_posting_app/screens/home/post_status_page.dart';
 
-class Post {
-  final String id;
-  final String title;
-  final String price;
-  final DateTime startDate;
-  final DateTime endDate;
-  final String status;
-  final String imageUrl;
+import '../../config/api_config.dart';
+import '../../providers/get_post_byUser_provider.dart';
+import '../../providers/post_status_provider.dart';
 
-  Post({
-    required this.id,
-    required this.title,
-    required this.price,
-    required this.startDate,
-    required this.endDate,
-    required this.status,
-    required this.imageUrl,
-  });
-}
-
-class TinDaDang extends StatelessWidget {
+class TinDaDang extends StatefulWidget {
   const TinDaDang({super.key});
 
   @override
+  State<TinDaDang> createState() => _TinDaDangState();
+}
+
+class _TinDaDangState extends State<TinDaDang> {
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authProvider = context.read<AuthProvider>();
+
+      // Đợi đến khi user != null thì mới gọi API lấy bài đăng
+      while (authProvider.user == null) {
+        await Future.delayed(Duration(milliseconds: 100));
+      }
+
+      final userId = authProvider.user!.id;
+      context.read<GetPostByUserProvider>().fetchInitialPosts(userId);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final List<Post> posts = [
-      Post(
-        id: 'POST001',
-        title: 'Nhà cho thuê full nội thất',
-        price: '12.000.000đ',
-        startDate: DateTime(2025, 3, 21),
-        endDate: DateTime(2025, 4, 21),
-        status: 'Còn hạn',
-        imageUrl: 'assets/images/img1.jpg',
-      ),
-      Post(
-        id: 'POST002',
-        title: 'Nhà trọ Tuấn Anh gần công',
-        price: '1.200.000đ',
-        startDate: DateTime(2025, 4, 18),
-        endDate: DateTime(2025, 10, 18),
-        status: 'Còn hạn',
-        imageUrl: 'assets/images/img1.jpg',
-      ),
-      Post(
-        id: 'POST003',
-        title: 'Mặt bằng gần DH Cần Thơ',
-        price: '1.000.000đ',
-        startDate: DateTime(2025, 3, 21),
-        endDate: DateTime(2025, 8, 21),
-        status: 'Còn hạn',
-        imageUrl: 'assets/images/img1.jpg',
-      ),
-      Post(
-        id: 'POST004',
-        title: 'Nhà trọ 30 phòng gần',
-        price: '900.000đ',
-        startDate: DateTime(2025, 2, 5),
-        endDate: DateTime(2025, 12, 5),
-        status: 'Còn hạn',
-        imageUrl: 'assets/images/img1.jpg',
-      ),
-    ];
+    final postProvider = context.watch<GetPostByUserProvider>();
+    final listPosts = postProvider.posts;
+    String _mapTrangThaiToText(int trangthai) {
+      switch (trangthai) {
+        case 1:
+          return 'Khởi tạo';
+        case -2:
+          return 'Hết hạn';
+        case 2:
+          return 'Đã thanh toán';
+        case 3:
+          return 'Hiển thị';
+        case -1:
+          return 'Đã huỷ';
+        default:
+          return 'Khác';
+      }
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0a8066),
-        elevation: 0,
-        title: const Text(
-          'Danh sách tin đã đăng',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Montserrat',
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-      ),
-      body: Container(
-        color: Colors.blue[50],
-        child: ListView.builder(
-          padding: const EdgeInsets.all(8.0),
-          itemCount: posts.length,
-          itemBuilder: (context, index) {
-            final post = posts[index];
-            return Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 2,
-              margin: const EdgeInsets.symmetric(vertical: 8),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.blue,
                     ),
-                    child: Image.asset(
-                      post.imageUrl,
-                      width: 120,
-                      height: 120,
-                      fit: BoxFit.cover,
-                    ),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'Thuê trọ',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            post.title,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Giá: ${post.price}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Ngày bắt đầu: ${post.startDate.day}/${post.startDate.month}/${post.startDate.year}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                            ),
-                          ),
-                          Text(
-                            'Ngày kết thúc: ${post.endDate.day}/${post.endDate.month}/${post.endDate.year}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.red,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              // Navigator.push(
-                              //   context,
-                              //   MaterialPageRoute(
-                              //     builder: (context) => Thanhtoan(),
-                              //   ),
-                              // );
-                            },
-                            child: Text(
-                              'Trạng thái: ${post.status}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            'Ngày tạo: ${post.startDate.year}-${post.startDate.month.toString().padLeft(2, '0')}-${post.startDate.day.toString().padLeft(2, '0')} 21:32:46',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
+                  const Text(
+                    'Danh sách tin đã đăng',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
                     ),
                   ),
                 ],
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: Container(
+                color: Colors.blue[50],
+                child: listPosts.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(8.0),
+                        itemCount: listPosts.length,
+                        itemBuilder: (context, index) {
+                          final post = listPosts[index];
+                          return GestureDetector(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChangeNotifierProvider(
+                                    create: (_) => PostStatusProvider(),
+                                    child: PostDetailPage(
+                                      imageUrl: post.anhdaidien != null
+                                          ? FormatFunction.buildAvatarUrl(
+                                              post.anhdaidien ?? "")
+                                          : "${ApiConfig.baseUrl}/images/news-1.jpg",
+                                      ten: post.ten ?? '',
+                                      address: post.city?.ten ?? '',
+                                      gia: post.gia.toString(),
+                                      discountedPrice: "",
+                                      updateDate: FormatFunction.formatDate(
+                                          post.createdAt.toString()),
+                                      danhMuc: post.category.ten,
+                                      area: post.khuvuc.toString(),
+                                      level: "#${post.id}",
+                                      ngayBatDau: post.thoigian_batdau ?? '',
+                                      ngayKetThuc: FormatFunction.formatDate(
+                                          post.thoigian_ketthuc ?? ''),
+                                      description: post.mota ?? "",
+                                      star: post.dichvu_hot,
+                                      chitietdiachi: post.chitietdiachi ?? "",
+                                      khuVuc:
+                                          "${post.wards?.ten} / ${post.district?.ten}",
+                                      latitude: FormatFunction.parseCoordinates(
+                                              post.map ?? '')
+                                          .latitude,
+                                      longitude:
+                                          FormatFunction.parseCoordinates(
+                                                  post.map ?? '')
+                                              .longitude,
+                                      postId: post.id,
+                                      thoiGianTao: post.createdAt!,
+                                      trangThai: post.trangthai,
+                                    ),
+                                  ),
+                                ),
+                              );
+
+                              if (result == true) {
+                                final authProvider =
+                                    context.read<AuthProvider>();
+
+                                // Đợi user != null rồi mới fetch lại
+                                while (authProvider.user == null) {
+                                  await Future.delayed(
+                                      const Duration(milliseconds: 100));
+                                }
+
+                                final userId = authProvider.user!.id;
+                                context
+                                    .read<GetPostByUserProvider>()
+                                    .fetchInitialPosts(userId);
+                              }
+                            },
+                            child: Card(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                              margin: const EdgeInsets.symmetric(vertical: 8),
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 10),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(12),
+                                        bottomLeft: Radius.circular(12),
+                                      ),
+                                      child: Image.network(
+                                        post.anhdaidien != null
+                                            ? FormatFunction.buildAvatarUrl(
+                                                post.anhdaidien!)
+                                            : "${ApiConfig.baseUrl}/images/news-1.jpg",
+                                        width: 126,
+                                        height: 155,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12.0),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                post.category.ten,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 8,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              post.ten ?? '',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color:
+                                                    FormatFunction.formatTitle(
+                                                        post.dichvu_hot),
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            _buildInfoRow(
+                                                'Giá: ',
+                                                FormatFunction.formatPrice(
+                                                    post.gia)),
+                                            _buildInfoRow(
+                                                'Ngày bắt đầu: ',
+                                                FormatFunction.formatDate(
+                                                    post.thoigian_batdau ??
+                                                        '')),
+                                            _buildInfoRow(
+                                                'Ngày kết thúc: ',
+                                                FormatFunction.formatDate(
+                                                    post.thoigian_ketthuc ??
+                                                        '')),
+                                            _buildInfoRow(
+                                                'Trạng thái: ',
+                                                _mapTrangThaiToText(
+                                                    post.trangthai),
+                                                color:
+                                                    FormatFunction.formatStatus(
+                                                        statusCode:
+                                                            post.trangthai)),
+                                            _buildInfoRow(
+                                                'Ngày tạo: ',
+                                                FormatFunction.formatDate(
+                                                    post.createdAt ?? '')),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+Widget _buildInfoRow(String label, String value, {Color color = Colors.black}) {
+  return RichText(
+    text: TextSpan(
+      style: const TextStyle(fontSize: 14, color: Colors.black),
+      children: [
+        TextSpan(
+          text: label,
+          style: const TextStyle(color: Colors.grey),
+        ),
+        TextSpan(
+          text: value,
+          style: TextStyle(color: color),
+        ),
+      ],
+    ),
+  );
 }

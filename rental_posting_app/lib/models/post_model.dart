@@ -1,19 +1,14 @@
 class PostResponse {
-  final bool status;
-  final String message;
-  final PostPagination posts;
+  final List<Post> posts;
+  final int total;
 
-  PostResponse({
-    required this.status,
-    required this.message,
-    required this.posts,
-  });
+  PostResponse({required this.posts, required this.total});
 
   factory PostResponse.fromJson(Map<String, dynamic> json) {
     return PostResponse(
-      status: json['status'],
-      message: json['message'],
-      posts: PostPagination.fromJson(json['posts']),
+      posts:
+          (json['posts'] as List).map((post) => Post.fromJson(post)).toList(),
+      total: json['total'] ?? 0,
     );
   }
 }
@@ -30,38 +25,70 @@ class PostPagination {
   factory PostPagination.fromJson(Map<String, dynamic> json) {
     return PostPagination(
       currentPage: json['current_page'],
-      data: (json['data'] as List).map((e) => Post.fromJson(e)).toList(),
+      data: List<Post>.from(json['data'].map((x) => Post.fromJson(x))),
     );
   }
 }
 
 class Post {
   final int id;
-  final String ten;
+  final String? ten;
   final String? slug;
   final String? anhdaidien;
   final String? mota;
-  final int? qhuyenId;
-  final int? phuongxaId;
-  final int? gia;
-  final Category? category;
+  final int gia;
+  final int khoanggia;
+  final int khoangkhuvuc;
+  final int trangthai;
+  final int khuvuc;
+  final String? sophong;
+  final String? chitietdiachi;
+  final String noidung;
+  final int hot;
+  final String? lydo;
+  final Category category;
+  final String? thoigian_batdau;
+  final String? thoigian_ketthuc;
+  final String xacthuc_id;
+  final int dichvu_hot;
+  final String? map;
+  final int subject_id;
+  final String? video_link;
   final District? district;
-  final Ward? wards;
+  final Wards? wards;
   final City? city;
+  final String? createdAt;
+  final String? updated_at;
 
   Post({
     required this.id,
-    required this.ten,
+    this.ten,
     this.slug,
     this.anhdaidien,
     this.mota,
-    this.qhuyenId,
-    this.phuongxaId,
-    this.gia,
-    this.category,
+    required this.gia,
+    required this.khoanggia,
+    required this.khoangkhuvuc,
+    required this.trangthai,
+    required this.khuvuc,
+    this.sophong,
+    this.chitietdiachi,
+    required this.noidung,
+    required this.hot,
+    this.lydo,
+    required this.category,
+    this.thoigian_batdau,
+    this.thoigian_ketthuc,
+    required this.xacthuc_id,
+    required this.dichvu_hot,
+    this.map,
+    required this.subject_id,
+    this.video_link,
     this.district,
     this.wards,
     this.city,
+    this.createdAt,
+    this.updated_at,
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
@@ -71,15 +98,30 @@ class Post {
       slug: json['slug'],
       anhdaidien: json['anhdaidien'],
       mota: json['mota'],
-      qhuyenId: json['qhuyen_id'],
-      phuongxaId: json['phuongxa_id'],
-      gia: json['gia'],
-      category:
-          json['category'] != null ? Category.fromJson(json['category']) : null,
+      gia: json['gia'] ?? 0,
+      khoanggia: json['khoanggia'] ?? 0,
+      khoangkhuvuc: json['khoangkhuvuc'] ?? 0,
+      trangthai: json['trangthai'] ?? 0,
+      khuvuc: json['khuvuc'] ?? 0,
+      sophong: json['sophong'],
+      chitietdiachi: json['chitietdiachi'],
+      noidung: json['noidung'] ?? '',
+      hot: json['hot'] ?? 0,
+      lydo: json['lydo'],
+      category: Category.fromJson(json['category']),
+      thoigian_batdau: json['thoigian_batdau'],
+      thoigian_ketthuc: json['thoigian_ketthuc'],
+      xacthuc_id: json['xacthuc_id'].toString(),
+      dichvu_hot: json['dichvu_hot'],
+      map: json['map'],
+      subject_id: json['subject_id'] ?? 0,
+      video_link: json['video_link'],
       district:
           json['district'] != null ? District.fromJson(json['district']) : null,
-      wards: json['wards'] != null ? Ward.fromJson(json['wards']) : null,
+      wards: json['wards'] != null ? Wards.fromJson(json['wards']) : null,
       city: json['city'] != null ? City.fromJson(json['city']) : null,
+      createdAt: json['created_at'],
+      updated_at: json['updated_at'],
     );
   }
 }
@@ -87,19 +129,19 @@ class Post {
 class Category {
   final int id;
   final String ten;
-  final String? mota;
+  final String slug;
 
   Category({
     required this.id,
     required this.ten,
-    this.mota,
+    required this.slug,
   });
 
   factory Category.fromJson(Map<String, dynamic> json) {
     return Category(
       id: json['id'],
       ten: json['ten'],
-      mota: json['mota'],
+      slug: json['slug'],
     );
   }
 }
@@ -121,17 +163,17 @@ class District {
   }
 }
 
-class Ward {
+class Wards {
   final int id;
   final String ten;
 
-  Ward({
+  Wards({
     required this.id,
     required this.ten,
   });
 
-  factory Ward.fromJson(Map<String, dynamic> json) {
-    return Ward(
+  factory Wards.fromJson(Map<String, dynamic> json) {
+    return Wards(
       id: json['id'],
       ten: json['ten'],
     );

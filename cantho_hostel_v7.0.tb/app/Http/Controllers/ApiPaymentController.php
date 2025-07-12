@@ -14,13 +14,13 @@ class ApiPaymentController extends Controller
         try {
             date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-            $vnp_TmnCode    = "KYTBPU39"; //Website ID in VNPAY System
-            $vnp_HashSecret = "DGWHF48P4DWQ3D6OZ3APH2CY9DJ7ECUH"; //Secret key
+            $vnp_TmnCode    = env('VNPAY_TMN_CODE'); //Website ID in VNPAY System
+            $vnp_HashSecret = env('VNPAY_HASH_SECRET'); //Secret key
 
             $gateway = Omnipay::create('VNPay');
             $gateway->initialize([
-                'vnp_TmnCode' => 'KYTBPU39',
-                'vnp_HashSecret' => 'DGWHF48P4DWQ3D6OZ3APH2CY9DJ7ECUH',
+                'vnp_TmnCode' => env('VNPAY_TMN_CODE'),
+                'vnp_HashSecret' => env('VNPAY_HASH_SECRET'),
             ]);
 
             $response = $gateway->purchase([
@@ -44,7 +44,7 @@ class ApiPaymentController extends Controller
             $vnp_OrderType    = 'other';
             $vnp_Amount       = 150000 * 100;
             $vnp_Locale       = 'vn';
-            $vnp_BankCode     = 'NCB';
+            // $vnp_BankCode     = 'NCB';
             $vnp_IpAddr       = $_SERVER['REMOTE_ADDR'];
             $vnp_Bill_Mobile  = get_data_user('web', 'phone');
             $vnp_Bill_Email   = get_data_user('web', 'email');
@@ -60,7 +60,7 @@ class ApiPaymentController extends Controller
             $inputData        = array(
                 "vnp_RequestId"    => 12121211,
                 "vnp_Version"      => "2.1.0",
-                "vnp_Command"      => "refund",
+                "vnp_Command"      => "pay",
                 "vnp_TmnCode"      => $vnp_TmnCode,
                 "vnp_Amount"       => $vnp_Amount,
                 "vnp_CreateDate"   => date('YmdHis'),
@@ -119,4 +119,5 @@ class ApiPaymentController extends Controller
         }
         return response()->json($request->all());
     }
+
 }

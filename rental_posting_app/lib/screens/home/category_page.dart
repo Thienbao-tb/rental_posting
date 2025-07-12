@@ -1,19 +1,84 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:rental_posting_app/providers/get_post_byCategory_provider.dart';
 
+import '../../config/api_config.dart';
+import '../../config/format_function.dart';
+import 'filter_page.dart';
 import 'property_detail_page.dart';
 
-class CategoryPage extends StatelessWidget {
+class CategoryPage extends StatefulWidget {
   final String title;
-  final List<Map<String, String>> properties;
+  final List<int> categoryId;
+  final List<int> qhuyen;
+  final List<int> phuongxa;
+  final List<int> mucgia;
+  final List<int> dientich;
+  final String keyWord;
+  final bool noiBat;
+  final bool moiNhat;
 
-  const CategoryPage({
-    super.key,
-    required this.title,
-    required this.properties,
-  });
+  const CategoryPage(
+      {super.key,
+      required this.title,
+      required this.categoryId,
+      required this.keyWord,
+      required this.qhuyen,
+      required this.phuongxa,
+      required this.mucgia,
+      required this.dientich,
+      required this.noiBat,
+      required this.moiNhat});
+
+  @override
+  State<CategoryPage> createState() => _CategoryPageState();
+}
+
+class _CategoryPageState extends State<CategoryPage> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider =
+          Provider.of<GetPostByCategoryProvider>(context, listen: false);
+      provider.fetchPostByCategory(
+          categoryIds: widget.categoryId,
+          keyword: widget.keyWord,
+          priceRanges: widget.mucgia,
+          areaRanges: widget.dientich,
+          wardIds: widget.phuongxa,
+          districtIds: widget.qhuyen,
+          noiBat: widget.noiBat,
+          moiNhat: widget.moiNhat);
+    });
+
+    _scrollController.addListener(() {
+      final provider =
+          Provider.of<GetPostByCategoryProvider>(context, listen: false);
+
+      double current = _scrollController.position.pixels;
+      double max = _scrollController.position.maxScrollExtent;
+
+      if (current >= max - 50 && !provider.isLoading && provider.hasMore) {
+        provider.fetchMorePosts();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final getPostByCategoryProvider =
+        Provider.of<GetPostByCategoryProvider>(context);
+    final posts = getPostByCategoryProvider.posts;
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -34,20 +99,24 @@ class CategoryPage extends StatelessWidget {
                         },
                       ),
                       Text(
-                        '$title (${properties.length} tin)',
+                        '${widget.title} (${posts.length} tin)',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.blue,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                   IconButton(
                     icon: const Icon(Icons.filter_list, color: Colors.blue),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Mở trang bộ lọc')),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const FilterPage()),
                       );
                     },
                   ),
@@ -55,48 +124,101 @@ class CategoryPage extends StatelessWidget {
               ),
             ),
             // Danh sách tin đăng
+
             Expanded(
-              child: ListView.builder(
-                physics: const ClampingScrollPhysics(),
-                cacheExtent: 1000, // Tăng bộ nhớ đệm để giảm giật
-                itemCount: properties.length,
-                itemBuilder: (context, index) {
-                  final property = properties[index];
-                  return _buildPropertyItem(
-                    context: context,
-                    image: property['image'] ?? 'assets/images/placeholder.jpg',
-                    title: property['title'] ?? 'Không có tiêu đề',
-                    price: property['price'] ?? 'N/A',
-                    area: property['area'] ?? 'N/A',
-                    updateDate: property['updateDate'] ?? 'N/A',
-                    address: property['address'] ?? 'N/A',
-                    category: property['category'] ?? 'N/A',
-                    level: property['level'] ?? 'N/A',
-                    expiryDate: property['expiryDate'] ?? 'N/A',
-                    description: property['description'] ?? 'Không có mô tả',
-                  );
-                },
-              ),
-            ),
+              child: getPostByCategoryProvider.isLoading && posts.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : posts.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                'assets/images/noPost.png',
+                                width: 130,
+                              ),
+                              const Text(
+                                "Không có tin đăng cho danh mục này!!!",
+                                style: TextStyle(
+                                    fontSize: 16, color: Colors.black54),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          scrollDirection: Axis.vertical,
+                          itemCount: posts.length +
+                              (getPostByCategoryProvider.isLoading ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index < posts.length) {
+                              final post = posts[index];
+                              return _buildPropertyItem(
+                                context: context,
+                                image: post.anhdaidien != null
+                                    ? FormatFunction.buildAvatarUrl(
+                                        post.anhdaidien ?? "")
+                                    : "${ApiConfig.baseUrl}/images/news-1.jpg",
+                                title: post.ten ?? "",
+                                address: post.city?.ten ?? "",
+                                price: post.gia.toString(),
+                                discountedPrice: "",
+                                updateDate: FormatFunction.formatDate(
+                                    post.createdAt.toString()),
+                                category: post.category.ten,
+                                area: post.khuvuc.toString(),
+                                level: "#${post.id}",
+                                expiryDate: FormatFunction.formatDate(
+                                    post.thoigian_ketthuc.toString()),
+                                description: post.mota ?? "",
+                                star: post.dichvu_hot,
+                                chitietdiachi: post.chitietdiachi ?? "",
+                                idPhong: post.id,
+                                khuVuc:
+                                    "${post.wards?.ten} / ${post.district?.ten}",
+                                latitude: FormatFunction.parseCoordinates(
+                                        post.map ?? '')
+                                    .latitude,
+                                longitude: FormatFunction.parseCoordinates(
+                                        post.map ?? '')
+                                    .longitude,
+                              );
+                            } else {
+                              return const SizedBox(
+                                width: 250,
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+            )
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPropertyItem({
-    required BuildContext context,
-    required String image,
-    required String title,
-    required String price,
-    required String area,
-    required String updateDate,
-    required String address,
-    required String category,
-    required String level,
-    required String expiryDate,
-    required String description,
-  }) {
+  Widget _buildPropertyItem(
+      {required BuildContext context,
+      required String image,
+      required String title,
+      required String address,
+      required String price,
+      required String discountedPrice,
+      required String updateDate,
+      required String category,
+      required String area,
+      required String level,
+      required String expiryDate,
+      required String description,
+      required int star,
+      required String chitietdiachi,
+      required int idPhong,
+      required String khuVuc,
+      required double latitude,
+      required double longitude}) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -113,6 +235,11 @@ class CategoryPage extends StatelessWidget {
               updateDate: updateDate,
               expiryDate: expiryDate,
               description: description,
+              idPhong: idPhong,
+              star: star,
+              khuVuc: khuVuc,
+              latitude: latitude,
+              longitude: longitude,
             ),
           ),
         );
@@ -129,9 +256,9 @@ class CategoryPage extends StatelessWidget {
               // Hình ảnh
               ClipRRect(
                 borderRadius: BorderRadius.circular(8.0),
-                child: Image.asset(
+                child: Image.network(
                   image,
-                  width: 120, // Sửa kích thước hợp lý
+                  width: 120,
                   height: 120,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
@@ -150,17 +277,17 @@ class CategoryPage extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Colors.red,
+                        color: FormatFunction.formatTitle(star),
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$price | $area',
+                      '${FormatFunction.formatPrice(price)} | $area m\u00B2',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -176,7 +303,7 @@ class CategoryPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      address,
+                      khuVuc,
                       style: const TextStyle(
                         fontSize: 12,
                         color: Colors.black54,
@@ -201,6 +328,11 @@ class CategoryPage extends StatelessWidget {
                               updateDate: updateDate,
                               expiryDate: expiryDate,
                               description: description,
+                              idPhong: 0,
+                              star: 0,
+                              khuVuc: '',
+                              latitude: 0.0,
+                              longitude: 0.0,
                             ),
                           ),
                         );

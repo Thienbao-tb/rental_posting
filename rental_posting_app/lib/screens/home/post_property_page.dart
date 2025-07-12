@@ -1,7 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:provider/provider.dart';
+import 'package:rental_posting_app/screens/home/home_page.dart';
+
+import '../../providers/auth_provider.dart';
+import '../../providers/category_provider.dart';
+import '../../providers/location_provider.dart';
+import '../../providers/post_provider.dart';
 
 class PostPropertyPage extends StatefulWidget {
   const PostPropertyPage({super.key});
@@ -11,48 +20,39 @@ class PostPropertyPage extends StatefulWidget {
 }
 
 class _PostPropertyPageState extends State<PostPropertyPage> {
+  @override
+  void initState() {
+    Future.microtask(() async {
+      if (!mounted) return;
+      final categoryProvider =
+          Provider.of<CategoryProvider>(context, listen: false);
+      await categoryProvider.fetchCategory();
+
+      final locationProvider =
+          Provider.of<LocationProvider>(context, listen: false);
+      await locationProvider.fetchQhuyenLocation();
+    });
+    super.initState();
+  }
+
   // Controllers cho các TextField
   final TextEditingController _houseNumberController = TextEditingController();
   final TextEditingController _exactAddressController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _nameController =
-      TextEditingController(text: 'Vũ Tuấn Anh');
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _areaController = TextEditingController();
-
-  // Giá trị dropdown
+  LatLng? _selectedLocation;
   String? _selectedDistrict;
   String? _selectedWard;
   String? _selectedCategory;
 
-  // Danh sách giả lập cho dropdown
-  final List<String> districts = [
-    'Quận Ninh Kiều',
-    'Quận Bình Thủy',
-    'Quận Cái Răng'
-  ];
-  final List<String> wards = [
-    'Phường An Hòa',
-    'Phường An Bình',
-    'Phường Cái Khế'
-  ];
-  final List<String> categories = [
-    'Cho thuê nhà trọ',
-    'Nhà cho thuê',
-    'Ở ghép',
-    'Một bề bằng'
-  ];
-
-  // Biến để lưu ảnh bìa và album ảnh
   File? _coverImage;
   List<File> _albumImages = [];
-
-  // ImagePicker instance
   final ImagePicker _picker = ImagePicker();
 
-  // Hàm chọn ảnh bìa
   Future<void> _pickCoverImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
@@ -62,7 +62,6 @@ class _PostPropertyPageState extends State<PostPropertyPage> {
     }
   }
 
-  // Hàm chọn ảnh cho album (nhiều ảnh)
   Future<void> _pickAlbumImages() async {
     final List<XFile> images = await _picker.pickMultiImage();
     if (images.isNotEmpty) {
@@ -74,7 +73,6 @@ class _PostPropertyPageState extends State<PostPropertyPage> {
 
   @override
   void dispose() {
-    // Giải phóng các controller
     _houseNumberController.dispose();
     _exactAddressController.dispose();
     _titleController.dispose();
@@ -88,350 +86,392 @@ class _PostPropertyPageState extends State<PostPropertyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final categoryProvider = Provider.of<CategoryProvider>(context);
+    final locationProvider = Provider.of<LocationProvider>(context);
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.user;
+
+    final categorys = categoryProvider.categorys;
+    final qhuyens = locationProvider.qhuyen;
+    final phuongxas = locationProvider.phuongxaByQhuyen;
+
+    // Tự động điền thông tin user
+    _nameController.text = user?.ten ?? '';
+    _phoneController.text = user?.sodienthoai ?? '';
+
     return Scaffold(
+      appBar: AppBar(title: const Text('Đăng tin')),
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.blue),
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                    ),
-                    const Text(
-                      'Thêm mới',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Thông báo
-                Container(
-                  padding: const EdgeInsets.all(8.0),
-                  color: Colors.yellow[100],
-                  child: const Text(
-                    'Nếu bạn đã từng đăng tin trên canthohostel.com, hãy sử dụng chức năng ĐẨY TIN/ GIA HẠN/ NÂNG CẤP VIP trong mục QUẢN LÝ TIN ĐĂNG để làm mới, đẩy tin lên cao thay vì đăng tin mới. Tin đăng trùng lặp sẽ không được duyệt.',
-                    style: TextStyle(fontSize: 12, color: Colors.black87),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Địa chỉ cho thuê
-                const Text(
-                  'Địa chỉ cho thuê',
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Địa chỉ cho thuê',
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Quận/huyện',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: _selectedDistrict,
-                  items: districts.map((district) {
-                    return DropdownMenuItem<String>(
-                      value: district,
-                      child: Text(district),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedDistrict = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Phường/xã',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: _selectedWard,
-                  items: wards.map((ward) {
-                    return DropdownMenuItem<String>(
-                      value: ward,
-                      child: Text(ward),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedWard = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                TextField(
+                      color: Colors.blue)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                    labelText: 'Quận/huyện', border: OutlineInputBorder()),
+                value: _selectedDistrict,
+                items: qhuyens
+                    .map((qh) => DropdownMenuItem(
+                        value: qh.id.toString(), child: Text(qh.ten)))
+                    .toList(),
+                onChanged: (value) async {
+                  setState(() {
+                    _selectedDistrict = value;
+                    _selectedWard = null;
+                  });
+                  if (value != null) {
+                    await locationProvider
+                        .fetchPhuongXaByQhuyen(int.parse(value));
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                    labelText: 'Phường/xã', border: OutlineInputBorder()),
+                value: _selectedWard,
+                items: phuongxas
+                    .map((px) => DropdownMenuItem(
+                        value: px.id.toString(), child: Text(px.ten)))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedWard = value),
+              ),
+              const SizedBox(height: 8),
+              TextField(
                   controller: _houseNumberController,
                   decoration: const InputDecoration(
-                    labelText: 'Số nhà',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
+                      labelText: 'Số nhà', border: OutlineInputBorder())),
+              const SizedBox(height: 8),
+              TextField(
                   controller: _exactAddressController,
                   decoration: const InputDecoration(
-                    labelText: 'Địa chỉ chính xác',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Thông tin mô tả
-                const Text(
-                  'Thông tin mô tả',
+                      labelText: 'Địa chỉ chính xác',
+                      border: OutlineInputBorder())),
+              const SizedBox(height: 16),
+              const Text('Thông tin mô tả',
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Loại chuyên mục',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: _selectedCategory,
-                  items: categories.map((category) {
-                    return DropdownMenuItem<String>(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCategory = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                TextField(
+                      color: Colors.blue)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(
+                    labelText: 'Loại chuyên mục', border: OutlineInputBorder()),
+                value: _selectedCategory,
+                items: categorys
+                    .map((dm) => DropdownMenuItem(
+                        value: dm.id.toString(), child: Text(dm.ten)))
+                    .toList(),
+                onChanged: (value) => setState(() => _selectedCategory = value),
+              ),
+              const SizedBox(height: 8),
+              TextField(
                   controller: _titleController,
                   decoration: const InputDecoration(
-                    labelText: 'Tiêu đề',
-                    border: OutlineInputBorder(),
+                      labelText: 'Tiêu đề', border: OutlineInputBorder())),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _pickCoverImage,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                  decoration: BoxDecoration(
+                      border: Border.all(),
+                      borderRadius: BorderRadius.circular(4)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(_coverImage == null
+                          ? 'Chọn ảnh bìa'
+                          : 'Đã chọn ảnh bìa'),
+                      if (_coverImage != null)
+                        Image.file(_coverImage!,
+                            width: 50, height: 50, fit: BoxFit.cover),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: _pickCoverImage,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 16.0, horizontal: 12.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _coverImage == null
-                              ? 'Chọn ảnh bìa'
-                              : 'Đã chọn ảnh bìa',
-                          style: TextStyle(
-                            color: _coverImage == null
-                                ? Colors.grey
-                                : Colors.black,
-                          ),
-                        ),
-                        if (_coverImage != null)
-                          Image.file(
-                            _coverImage!,
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
+              ),
+              const SizedBox(height: 8),
+              TextField(
                   controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Mô tả nội dung',
-                    border: OutlineInputBorder(),
-                  ),
                   maxLines: 5,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Bản đồ',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: double.infinity,
-                  height: 200,
-                  color: Colors.grey[300],
-                  child: const Center(
-                    child: Text(
-                      'Bản đồ (Chưa triển khai)',
-                      style: TextStyle(fontSize: 14, color: Colors.black54),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Thông tin liên hệ
-                const Text(
-                  'Thông tin liên hệ',
+                  decoration: const InputDecoration(
+                      labelText: 'Mô tả nội dung',
+                      border: OutlineInputBorder())),
+              // thêm một biến luu giá trị kinh độ, vĩ độ, sử dụng open stret map tạo một bản đồ và người dùng đánh dấu và nhân lưu kinh độ vĩ độ lại,
+              const SizedBox(height: 16),
+              const Text('Vị trí trên bản đồ',
                   style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue),
+                      color: Colors.blue)),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 300,
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: LatLng(10.7769, 106.7009),
+                    initialZoom: 13,
+                    onTap: (tapPosition, point) {
+                      setState(() {
+                        _selectedLocation = point;
+                      });
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.yourapp',
+                    ),
+                    if (_selectedLocation != null)
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            width: 80,
+                            height: 80,
+                            point: _selectedLocation!,
+                            child: const Icon(Icons.location_pin,
+                                size: 40, color: Colors.red),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                TextField(
+              ),
+              const SizedBox(height: 8),
+              Text(_selectedLocation == null
+                  ? 'Chưa chọn vị trí'
+                  : 'Vị trí đã chọn: ${_selectedLocation!.latitude.toStringAsFixed(5)}, ${_selectedLocation!.longitude.toStringAsFixed(5)}'),
+              const SizedBox(height: 16),
+              const Text('Thông tin liên hệ',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue)),
+              const SizedBox(height: 8),
+              TextField(
+                  readOnly: true,
                   controller: _nameController,
                   decoration: const InputDecoration(
-                    labelText: 'Họ tên',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: _pickAlbumImages,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 16.0, horizontal: 12.0),
-                    decoration: BoxDecoration(
+                      labelText: 'Họ tên', border: OutlineInputBorder())),
+              const SizedBox(height: 8),
+              TextField(
+                  readOnly: true,
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                      labelText: 'Điện thoại', border: OutlineInputBorder())),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _pickAlbumImages,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 16.0, horizontal: 12.0),
+                  decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(4.0),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _albumImages.isEmpty
-                              ? 'Chọn album ảnh'
-                              : 'Đã chọn ${_albumImages.length} ảnh',
-                          style: TextStyle(
-                            color: _albumImages.isEmpty
-                                ? Colors.grey
-                                : Colors.black,
+                      borderRadius: BorderRadius.circular(4.0)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(_albumImages.isEmpty
+                          ? 'Chọn album ảnh'
+                          : 'Đã chọn ${_albumImages.length} ảnh'),
+                      if (_albumImages.isNotEmpty)
+                        SizedBox(
+                          width: 50,
+                          height: 50,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _albumImages.length > 1 ? 2 : 1,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 4.0),
+                                child: Image.file(_albumImages[index],
+                                    width: 50, height: 50, fit: BoxFit.cover),
+                              );
+                            },
                           ),
                         ),
-                        if (_albumImages.isNotEmpty)
-                          SizedBox(
-                            width: 50,
-                            height: 50,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _albumImages.length > 1 ? 2 : 1,
-                              itemBuilder: (context, index) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 4.0),
-                                  child: Image.file(
-                                    _albumImages[index],
-                                    width: 50,
-                                    height: 50,
-                                    fit: BoxFit.cover,
-                                  ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      labelText: 'Giá cho thuê (Đồng)',
+                      border: OutlineInputBorder())),
+              const SizedBox(height: 8),
+              TextField(
+                  controller: _areaController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      labelText: 'Diện tích (m²)',
+                      border: OutlineInputBorder())),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  final errors = <String>[];
+
+                  // Validate quận/huyện và phường/xã
+                  if (_selectedDistrict == null)
+                    errors.add("Vui lòng chọn quận/huyện.");
+                  if (_selectedWard == null)
+                    errors.add("Vui lòng chọn phường/xã.");
+
+                  // Validate địa chỉ
+                  if (_houseNumberController.text.trim().isEmpty) {
+                    errors.add("Vui lòng nhập số nhà.");
+                  }
+                  if (_exactAddressController.text.trim().isEmpty) {
+                    errors.add("Vui lòng nhập địa chỉ chính xác.");
+                  }
+
+                  // Validate chuyên mục
+                  if (_selectedCategory == null)
+                    errors.add("Vui lòng chọn chuyên mục.");
+
+                  // Validate tiêu đề
+                  final title = _titleController.text.trim();
+                  if (title.isEmpty) {
+                    errors.add("Vui lòng nhập tiêu đề.");
+                  } else if (title.length < 10) {
+                    errors.add("Tiêu đề phải từ 10 ký tự trở lên.");
+                  }
+
+                  // Validate mô tả
+                  if (_descriptionController.text.trim().isEmpty) {
+                    errors.add("Vui lòng nhập mô tả nội dung.");
+                  }
+
+                  // Validate số điện thoại (nếu có)
+                  final phone = _phoneController.text.trim();
+                  if (phone.isNotEmpty &&
+                      !RegExp(r'^0[0-9]{9}$').hasMatch(phone)) {
+                    errors.add(
+                        "Số điện thoại phải có 10 chữ số và bắt đầu bằng 0.");
+                  }
+
+                  // Validate giá và diện tích
+                  final price = num.tryParse(_priceController.text.trim());
+                  if (price == null || price < 0) {
+                    errors.add("Giá cho thuê phải là số hợp lệ.");
+                  }
+                  final area = num.tryParse(_areaController.text.trim());
+                  if (area == null || area < 0) {
+                    errors.add("Diện tích phải là số hợp lệ.");
+                  }
+
+                  if (_selectedLocation == null) {
+                    errors.add("Vui lòng chọn vị trí trên bản đồ.");
+                  }
+
+                  // Nếu có lỗi thì hiển thị và dừng lại
+                  if (errors.isNotEmpty) {
+                    final errorMessage = errors.join("\n");
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(errorMessage),
+                      backgroundColor: Colors.red,
+                    ));
+                    return;
+                  }
+
+                  // Gọi API đăng tin
+                  final postProvider =
+                      Provider.of<PostProvider>(context, listen: false);
+                  final result = await postProvider.submitPost(
+                    ten: title,
+                    motat: _descriptionController.text.trim(),
+                    qhuyenId: int.parse(_selectedDistrict!),
+                    phuongxaId: int.parse(_selectedWard!),
+                    gia: price!.toInt(),
+                    dientich: area!.toInt(),
+                    danhmucId: int.parse(_selectedCategory!),
+                    sophong: _houseNumberController.text.trim(),
+                    chitietdiachi: _exactAddressController.text.trim(),
+                    map:
+                        '${_selectedLocation!.longitude},${_selectedLocation!.latitude}',
+                    anhdaidien: _coverImage,
+                    albumFiles: _albumImages,
+                  );
+
+                  print(result['status']);
+
+                  if (result['status'] == true) {
+                    showDialog(
+                      context: context,
+                      barrierDismissible:
+                          false, // không cho bấm ra ngoài để tắt
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          title: const Row(
+                            children: [
+                              Icon(Icons.check_circle_outline,
+                                  color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('Thành công'),
+                            ],
+                          ),
+                          content: const Text(
+                            'Đăng tin thành công!\nTiến hành thanh toán để tin nằm ở vị trí dễ nhìn thấy hơn.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) =>
+                                          const BottomNavScreen()),
                                 );
                               },
+                              child: const Text('Oke'),
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Điện thoại',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _priceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Giá cho thuê (Đồng)',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _areaController,
-                  decoration: const InputDecoration(
-                    labelText: 'Diện tích (m²)',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                // Nút Đăng tin
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Kiểm tra dữ liệu trước khi đăng tin
-                      if (_selectedDistrict == null ||
-                          _selectedWard == null ||
-                          _houseNumberController.text.isEmpty ||
-                          _exactAddressController.text.isEmpty ||
-                          _selectedCategory == null ||
-                          _titleController.text.isEmpty ||
-                          _coverImage == null ||
-                          _descriptionController.text.isEmpty ||
-                          _nameController.text.isEmpty ||
-                          _phoneController.text.isEmpty ||
-                          _priceController.text.isEmpty ||
-                          _areaController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'Vui lòng điền đầy đủ thông tin và chọn ảnh bìa!')),
+                          ],
                         );
-                        return;
-                      }
-
-                      // Logic xử lý đăng tin (chưa triển khai)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Tin đã được đăng thành công!')),
-                      );
-                      Navigator.pop(
-                          context); // Quay lại trang trước sau khi đăng tin
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 16.0),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30.0),
+                      },
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text(result['message'] ?? 'Đăng tin thất bại.'),
+                        backgroundColor: Colors.red,
                       ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Đăng tin',
-                          style: TextStyle(fontSize: 16, color: Colors.white),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(Icons.arrow_forward, color: Colors.white),
-                      ],
-                    ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.0),
                   ),
                 ),
-              ],
-            ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Đăng tin',
+                        style: TextStyle(fontSize: 16, color: Colors.white)),
+                    SizedBox(width: 8),
+                    Icon(Icons.arrow_forward, color: Colors.white),
+                  ],
+                ),
+              )
+            ],
           ),
         ),
       ),

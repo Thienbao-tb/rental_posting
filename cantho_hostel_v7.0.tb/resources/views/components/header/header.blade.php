@@ -1,4 +1,4 @@
-<!-- <div class="mb-icon-nav js-mobile-panel bars-display">  
+<!-- <div class="mb-icon-nav js-mobile-panel bars-display">
     <i class="fa fa-bars" aria-hidden="true"></i>
 
 </div> -->
@@ -59,7 +59,7 @@
                     <div class="welcome-text">
                         @if (Auth::user()->anhdaidien)
                         <img src="{{ pare_url_file(Auth::user()->anhdaidien) }}"
-                            style="width: 40px;height: 40px;border-radius: 50%" alt="">
+                            style="width: 40px;height: 40px;border-radius: 50%;display: block" alt="">
                         @else
                         <img src="https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
                             style="width: 40px;height: 40px;border-radius: 50%" alt="">
@@ -81,7 +81,7 @@
                                 Cập nhật tài khoản
                             </a>
                             <a href="{{ route('get_user.recharge.index') }}" class="text-bold  text-navigation">
-                                
+
                                 Nạp tiền
                             </a>
                             <a href="{{ route('get_user.recharge.history') }}" class="text-bold  text-navigation">
@@ -96,7 +96,7 @@
                             <a href="{{ route('get_user.room.index') }}" class="text-bold text-navigation">Tin đăng</a>
 
                         {{--     <a href="{{ route('get_user.pass.index') }}" class="text-bold text-navigation">Bán đồ cũ</a> --}}
-                            
+
                             <a href="{{ route('get.logout') }}" class="text-bold text-navigation">Đăng xuất</a>
                         </div>
                     </div>

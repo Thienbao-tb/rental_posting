@@ -1,104 +1,97 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:rental_posting_app/config/format_function.dart';
+import 'package:rental_posting_app/providers/blog_provider.dart';
 
-class BlogListScreen extends StatelessWidget {
+import 'blog_detail_screen.dart';
+
+class BlogListScreen extends StatefulWidget {
   const BlogListScreen({super.key});
+
+  @override
+  State<BlogListScreen> createState() => _BlogListScreenState();
+}
+
+class _BlogListScreenState extends State<BlogListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final blogProvider = Provider.of<BlogProvider>(context, listen: false);
+      blogProvider.fetchBlog();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xfff5f9ff),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0a8066),
-        elevation: 0,
-        title: const Text(
-          'Danh sách bài viết',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Danh sách bài viết',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Consumer<BlogProvider>(
+                builder: (context, provider, child) {
+                  if (provider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (provider.blogs.isEmpty) {
+                    return const Center(child: Text("Không có bài viết nào."));
+                  }
+
+                  return ListView.builder(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    itemCount: provider.blogs.length,
+                    itemBuilder: (context, index) {
+                      final blog = provider.blogs[index];
+                      return BlogPostCard(
+                        imageUrl:
+                            FormatFunction.buildAvatarUrl(blog.anhdaidien),
+                        title: blog.ten,
+                        description: blog.mota,
+                        content: blog.noidung,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
       ),
-      body: const BlogPostList(),
-    );
-  }
-}
-
-class BlogPost {
-  final String imageUrl;
-  final String title;
-  final String description;
-
-  BlogPost({
-    required this.imageUrl,
-    required this.title,
-    required this.description,
-  });
-}
-
-class BlogPostList extends StatelessWidget {
-  const BlogPostList({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final List<BlogPost> posts = [
-      BlogPost(
-        imageUrl: 'assets/images/img1.jpg',
-        title: 'Chú ý 9 kinh nghiệm tìm thuê nhà trọ bạn nhất định phải lưu ý',
-        description:
-            'Thuê nhà trọ - phòng trọ là mối quan tâm của rất nhiều sinh viên, người lao động xa quê tìm đến các thành phố để học tập...',
-      ),
-      BlogPost(
-        imageUrl: 'assets/images/img2.jpg',
-        title: 'Top 5 mẹo tiết kiệm chi phí khi thuê nhà trọ',
-        description:
-            'Hướng dẫn bạn cách tiết kiệm chi phí khi thuê nhà trọ mà vẫn đảm bảo chất lượng sống tốt...',
-      ),
-      BlogPost(
-        imageUrl: 'assets/images/img3.jpg',
-        title: 'Những điều cần biết trước khi ký hợp đồng thuê trọ',
-        description:
-            'Tìm hiểu các điều khoản quan trọng trong hợp đồng thuê trọ để tránh rủi ro...',
-      ),
-      BlogPost(
-        imageUrl: 'assets/images/img1.jpg',
-        title: 'Làm thế nào để tìm nhà trọ an toàn tại thành phố lớn',
-        description:
-            'Một số lưu ý giúp bạn tìm nhà trọ an toàn và phù hợp tại các thành phố lớn...',
-      ),
-      BlogPost(
-        imageUrl: 'assets/images/img2.jpg',
-        title: 'Kinh nghiệm chọn nhà trọ gần trường đại học',
-        description:
-            'Hướng dẫn sinh viên cách chọn nhà trọ gần trường để tiết kiệm thời gian di chuyển...',
-      ),
-      BlogPost(
-        imageUrl: 'assets/images/img3.jpg',
-        title: 'Cách xử lý khi gặp vấn đề với chủ nhà trọ',
-        description:
-            'Một số mẹo để giải quyết mâu thuẫn với chủ nhà trọ một cách hiệu quả...',
-      ),
-    ];
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      itemCount: posts.length,
-      itemBuilder: (context, index) {
-        return BlogPostCard(post: posts[index]);
-      },
     );
   }
 }
 
 class BlogPostCard extends StatelessWidget {
-  final BlogPost post;
+  final String imageUrl;
+  final String title;
+  final String description;
+  final String content;
 
-  const BlogPostCard({super.key, required this.post});
+  const BlogPostCard(
+      {super.key,
+      required this.imageUrl,
+      required this.title,
+      required this.description,
+      required this.content});
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +110,18 @@ class BlogPostCard extends StatelessWidget {
         ],
       ),
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => BlogDetailScreen(
+                ten: title,
+                mota: description,
+                noidung: content,
+              ),
+            ),
+          );
+        },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(15),
           child: IntrinsicHeight(
@@ -131,8 +135,8 @@ class BlogPostCard extends StatelessWidget {
                   ),
                   child: SizedBox(
                     width: 150,
-                    child: Image.asset(
-                      post.imageUrl,
+                    child: Image.network(
+                      imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
@@ -151,7 +155,7 @@ class BlogPostCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          post.title,
+                          title,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -162,7 +166,7 @@ class BlogPostCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          post.description,
+                          description,
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[600],

@@ -43,12 +43,12 @@ body {
 /* start  */
 
 :root {
-  /* --primary-color: #002655;  #45c4be  #0a8066*/ 
-  --primary-color: #0a8066;  
+  /* --primary-color: #002655;  #45c4be  #0a8066*/
+  --primary-color: #0a8066;
 
 
   /* --btn-primary-color: #0034fb; */
-  --btn-primary-color: #00abfd; 
+  --btn-primary-color: #00abfd;
 }
 .addfund_method_list {
   justify-content: center;
@@ -2392,9 +2392,9 @@ i {
 }
 .header-area .user-welcome .user-history {
   position: absolute;
-  top: -125px;
+  top: 61px;
   right: 0;
-  transform: translateY(50%);
+  /* transform: translateY(50%); */
   background-color: #fff;
   min-width: 300px;
   display: none;
@@ -2588,7 +2588,7 @@ i {
 }
 .footer .footer-content .footer-nav .footer-col .footer-menu > li > a:hover {
   transform: translateX(4px);
-  
+
 }
 .footer .footer-content .footer-nav .footer-col .social-links i {
   margin-right: 5px;
@@ -3671,16 +3671,16 @@ i {
 
 @media screen and (max-width: 902px) {
   .whyus-sp-user {
-    grid-template-columns: repeat(2, 1fr); 
+    grid-template-columns: repeat(2, 1fr);
     gap: 20px;
-  } 
+  }
 }
 
 @media screen and (max-width: 576px) {
   .whyus-sp-user {
-    grid-template-columns: repeat(1, 1fr); 
+    grid-template-columns: repeat(1, 1fr);
     gap: 20px;
-  } 
+  }
 }
 
 @media (max-width: 768px) {
@@ -3710,8 +3710,8 @@ i {
 
 
 .mobile_header {
-  
-  display: none; 
+
+  display: none;
   /* khi click thì display: flex; */
   justify-content: space-between;
   align-items: center;
@@ -3811,7 +3811,7 @@ i {
 .setup_mb_table {
   width: 100%;
   overflow-x: scroll;
-  scrollbar-width: none; 
+  scrollbar-width: none;
 }
   .setup_mb_table::-webkit-scrollbar {
     width: 5px; /* Chiều rộng thanh cuộn */
@@ -3820,7 +3820,7 @@ i {
     display: none;
   }
   .table-responsive {
-   scrollbar-width: none; 
+   scrollbar-width: none;
   }
   .carousel-handle__list-item .slide-item {
     height: 200px;

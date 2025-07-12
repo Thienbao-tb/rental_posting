@@ -92,8 +92,8 @@ class UserRechargeController extends Controller
     {
         date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-        $vnp_TmnCode = "KYTBPU39"; //Website ID in VNPAY System
-        $vnp_HashSecret = "DGWHF48P4DWQ3D6OZ3APH2CY9DJ7ECUH"; //Secret key
+        $vnp_TmnCode = env('VNPAY_TMN_CODE'); //Website ID in VNPAY System
+        $vnp_HashSecret = env('VNPAY_HASH_SECRET'); //Secret key
         $vnp_Url = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
         $vnp_Returnurl = "http://127.0.0.1:8000/user/lich-su-nap-tien.html";
         $vnp_apiUrl = "http://sandbox.vnpayment.vn/merchant_webapi/merchant.html";
@@ -106,7 +106,7 @@ class UserRechargeController extends Controller
         $vnp_OrderType = 'other';
         $vnp_Amount = $rechargeHistory->tongtien * 100;
         $vnp_Locale = 'vn';
-        $vnp_BankCode = 'NCB';
+        // $vnp_BankCode = 'NCB';
         $vnp_IpAddr = $_SERVER['REMOTE_ADDR'];
         //        $vnp_ExpireDate = $_POST['txtexpire'];
         $vnp_Bill_Mobile = get_data_user('web', 'sodienthoai');

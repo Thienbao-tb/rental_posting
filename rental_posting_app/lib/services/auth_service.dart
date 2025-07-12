@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -43,7 +45,7 @@ class AuthService {
       String password, String passwordConfirmation, String sdt) async {
     try {
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.register}'),
+        Uri.parse('${ApiConfig.apiBaseUrl}${ApiConfig.register}'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           "ten": name,
@@ -77,7 +79,7 @@ class AuthService {
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.login}'),
+        Uri.parse('${ApiConfig.apiBaseUrl}${ApiConfig.login}'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'email': email,
@@ -112,7 +114,7 @@ class AuthService {
       }
 
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.user}'),
+        Uri.parse('${ApiConfig.apiBaseUrl}${ApiConfig.user}'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -149,7 +151,7 @@ class AuthService {
       }
 
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.logout}'),
+        Uri.parse('${ApiConfig.apiBaseUrl}${ApiConfig.logout}'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -170,6 +172,106 @@ class AuthService {
       await _removeToken();
       _currentUser = null;
       return {'success': true, 'message': 'Đã đăng xuất khỏi thiết bị này'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateUserInfo({
+    required String ten,
+    required String email,
+    required String sodienthoai,
+    File? avatarFile,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'message': 'Chưa đăng nhập'};
+    }
+
+    final dio = Dio();
+    final formData = FormData.fromMap({
+      'ten': ten,
+      'email': email,
+      'sodienthoai': sodienthoai,
+      if (avatarFile != null)
+        'anhdaidien': await MultipartFile.fromFile(avatarFile.path,
+            filename: avatarFile.path.split('/').last),
+    });
+
+    try {
+      print('${ApiConfig.apiBaseUrl}/update-user');
+      final response = await dio.post(
+        '${ApiConfig.apiBaseUrl}/update-user',
+        data: formData,
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+          contentType: 'multipart/form-data',
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+
+      final responseData = response.data;
+
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        _currentUser = User.fromJson(responseData['user']);
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Cập nhật thành công',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Cập nhật thất bại',
+          'errors': responseData['errors'],
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'message': 'Chưa đăng nhập'};
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiBaseUrl}/update-password'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode({
+          'current_password': currentPassword,
+          'new_password': newPassword,
+          'new_password_confirmation': newPasswordConfirmation,
+        }),
+      );
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Đổi mật khẩu thành công'
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Đổi mật khẩu thất bại',
+          'errors': responseData['errors'],
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối: $e'};
     }
   }
 }

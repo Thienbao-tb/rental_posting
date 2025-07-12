@@ -1,88 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:rental_posting_app/providers/post_provider.dart';
+import 'package:rental_posting_app/providers/highlight_post_provider.dart';
 
-class TestApiUi extends StatefulWidget {
-  const TestApiUi({super.key});
+import '../models/post_model.dart';
+
+class PostListScreen extends StatefulWidget {
+  const PostListScreen({super.key});
 
   @override
-  State<TestApiUi> createState() => _TestApiUiState();
+  State<PostListScreen> createState() => _PostListScreenState();
 }
 
-class _TestApiUiState extends State<TestApiUi> {
-  int currentPage = 1;
+class _PostListScreenState extends State<PostListScreen> {
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchPosts();
+    final highlightPostProvider =
+        Provider.of<HighlightPostProvider>(context, listen: false);
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 200 &&
+          !highlightPostProvider.isLoading &&
+          highlightPostProvider.hasMore) {
+        highlightPostProvider.fetchMorePosts();
+      }
     });
   }
 
-  void _fetchPosts() {
-    context.read<PostProvider>().getAllPost(page: currentPage);
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
-  void _nextPage() {
-    setState(() {
-      currentPage++;
-    });
-    _fetchPosts();
-  }
-
-  void _previousPage() {
-    if (currentPage > 1) {
-      setState(() {
-        currentPage--;
-      });
-      _fetchPosts();
-    }
+  Widget _buildPostItem(Post post) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+      child: ListTile(
+        title: Text(post.ten ?? ""),
+        subtitle: Text(post.city?.ten ?? ""),
+        trailing: Text('${post.gia ?? 0} đ'),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final postState = context.watch<PostProvider>();
-    final posts = postState.posts;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("Test API")),
-      body: Column(
-        children: [
-          Expanded(
-            child: postState.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    itemCount: posts.length,
-                    itemBuilder: (context, index) {
-                      final post = posts[index];
-                      return ListTile(
-                        title: Text(post.ten),
-                      );
-                    },
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: _previousPage,
-                  child: const Text("Trang trước"),
-                ),
-                const SizedBox(width: 16),
-                Text("Trang $currentPage"),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: _nextPage,
-                  child: const Text("Trang sau"),
-                ),
-              ],
+    return Consumer<HighlightPostProvider>(
+      builder: (context, postProvider, child) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Danh sách bài đăng')),
+          body: RefreshIndicator(
+            onRefresh: () async {
+              await postProvider.fetchInitialPosts();
+            },
+            child: ListView.builder(
+              controller: _scrollController,
+              itemCount: postProvider.posts.length + 1,
+              itemBuilder: (context, index) {
+                if (index < postProvider.posts.length) {
+                  return _buildPostItem(postProvider.posts[index]);
+                } else {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: postProvider.hasMore
+                          ? const CircularProgressIndicator()
+                          : const Text('Không còn bài viết nào.'),
+                    ),
+                  );
+                }
+              },
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

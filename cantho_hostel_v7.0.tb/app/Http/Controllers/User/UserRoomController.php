@@ -34,7 +34,7 @@ class UserRoomController extends Controller
         return view('user.room.index', $viewData);
     }
 
-    // pass đồ 
+    // pass đồ
     public function indexPass(Request $request)
     {
         $rooms = Phong::with('category:id,ten,slug', 'wards:id,ten,slug', 'district:id,ten,slug', 'paymentHistory:id,phong_id')
@@ -64,8 +64,6 @@ class UserRoomController extends Controller
 
         return view('user.BuySellSwap.create', $viewData);
     }
-
-
     public function storePass(UserRoomRequest $request)
     {
         $data               = $request->except('_token', 'anhdaidien', 'file');
@@ -99,9 +97,6 @@ class UserRoomController extends Controller
 
         return redirect()->back();
     }
-
-
-
     public function payRoomPass($id)
     {
         $room = Phong::where([
@@ -116,7 +111,6 @@ class UserRoomController extends Controller
 
         return view('user.BuySellSwap.pay', $viewData);
     }
-
     public function savePayRoomPass($id, Request $request)
     {
         $room            = Phong::find($id);
@@ -171,7 +165,7 @@ class UserRoomController extends Controller
             return redirect()->back();
         }
     }
-    // end pass đồ 
+    // end pass đồ
 
     public function create(Request $request)
     {
@@ -519,7 +513,7 @@ class UserRoomController extends Controller
                     'duongdan'       => $filename,
                     'phong_id'    => $productID,
                     'created_at' => Carbon::now()
-                ]);
+            ]);
         }
     }
 
